@@ -20,6 +20,7 @@ def verify_desktop(page, console_errors):
     page.goto(BASE_URL, wait_until="networkidle")
     page.wait_for_selector("canvas")
     assert page.evaluate("window.__xingyaStore.getState().isMuted") is True
+    page.wait_for_timeout(TRANSITION_SETTLE_MS)
     assert page.locator("canvas").count() == 1
     canvas_box = page.locator("canvas").bounding_box()
     assert canvas_box is not None
@@ -138,6 +139,7 @@ def verify_learning_hub(browser):
     for index, (x, y, module_id) in enumerate(modules, start=1):
         page.mouse.click(x, y)
         wait_for_scene(page, "LearningQuestScene")
+        page.wait_for_timeout(TRANSITION_SETTLE_MS)
         details = page.evaluate(
             """() => {
               const scene = window.__xingyaGame.scene.getScene('LearningQuestScene')
