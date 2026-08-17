@@ -177,12 +177,13 @@ def verify_relaxation_games(browser):
     wait_for_scene(page, "RelaxationHubScene")
 
     games = [
-        (320, "ThunderFlightScene"),
-        (640, "RainbowBlocksScene"),
-        (960, "TinyRaceScene"),
+        (384, 278, "ThunderFlightScene"),
+        (896, 278, "WhackAMoleScene"),
+        (384, 510, "RainbowBlocksScene"),
+        (896, 510, "TinyRaceScene"),
     ]
-    for index, (x, scene_key) in enumerate(games, start=1):
-        page.mouse.click(x, 390)
+    for index, (x, y, scene_key) in enumerate(games, start=1):
+        page.mouse.click(x, y)
         wait_for_scene(page, scene_key)
         page.wait_for_timeout(TRANSITION_SETTLE_MS)
         if scene_key == "ThunderFlightScene":
@@ -194,6 +195,24 @@ def verify_relaxation_games(browser):
                 "beforeX => window.__xingyaGame.scene.getScene('ThunderFlightScene').player.x < beforeX",
                 arg=before_x,
             )
+            page.wait_for_function(
+                "window.__xingyaGame.scene.getScene('ThunderFlightScene').enemyBullets.length > 0"
+            )
+        elif scene_key == "WhackAMoleScene":
+            mole_state = page.evaluate(
+                """() => {
+                  const scene = window.__xingyaGame.scene.getScene('WhackAMoleScene')
+                  scene.spawnMole()
+                  return {
+                    slots: scene.slots.length,
+                    timeLeft: scene.timeLeft,
+                    selected: scene.selectedIndex,
+                  }
+                }"""
+            )
+            assert mole_state["slots"] == 9
+            assert mole_state["timeLeft"] > 0
+            assert mole_state["selected"] == 4
         elif scene_key == "RainbowBlocksScene":
             block_state = page.evaluate(
                 """() => {
@@ -218,6 +237,17 @@ def verify_relaxation_games(browser):
                 "beforeLane => window.__xingyaGame.scene.getScene('TinyRaceScene').laneIndex < beforeLane",
                 arg=before_lane,
             )
+            road_state = page.evaluate(
+                """() => {
+                  const scene = window.__xingyaGame.scene.getScene('TinyRaceScene')
+                  return {
+                    roadWidth: scene.roadWidthAt(scene.playerY),
+                    finishDistance: scene.finishDistance,
+                  }
+                }"""
+            )
+            assert road_state["roadWidth"] > 0
+            assert road_state["finishDistance"] > 0
         page.screenshot(path=str(OUTPUT_DIR / f"relaxation-{index}.png"))
         page.mouse.click(72, 42)
         wait_for_scene(page, "RelaxationHubScene")

@@ -12,6 +12,7 @@ import { RelaxationHubScene } from '../scenes/RelaxationHubScene'
 import { ThunderFlightScene } from '../scenes/ThunderFlightScene'
 import { TinyRaceScene } from '../scenes/TinyRaceScene'
 import { RainbowBlocksScene } from '../scenes/RainbowBlocksScene'
+import { WhackAMoleScene } from '../scenes/WhackAMoleScene'
 
 export function createPhaserConfig(parent: string | HTMLElement): Phaser.Types.Core.GameConfig {
   return {
@@ -24,7 +25,7 @@ export function createPhaserConfig(parent: string | HTMLElement): Phaser.Types.C
       width: 1280,
       height: 720,
     },
-    scene: [BootScene, AdventureMapScene, MathGardenScene, ForestCompareScene, SoundHarborScene, RewardScene, CompanionScene, LearningHubScene, LearningQuestScene, RelaxationHubScene, ThunderFlightScene, RainbowBlocksScene, TinyRaceScene],
+    scene: [BootScene, AdventureMapScene, MathGardenScene, ForestCompareScene, SoundHarborScene, RewardScene, CompanionScene, LearningHubScene, LearningQuestScene, RelaxationHubScene, ThunderFlightScene, WhackAMoleScene, RainbowBlocksScene, TinyRaceScene],
     input: {
       gamepad: true,
       keyboard: true,

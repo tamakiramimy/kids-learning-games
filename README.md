@@ -44,20 +44,23 @@
 
 <p align="center">
 	<img src="docs/screenshots/game-thunder-flight.png" alt="雷光飞行小游戏" width="32%" />
+	<img src="docs/screenshots/game-whack-mole.png" alt="打地鼠小游戏" width="32%" />
+</p>
+<p align="center">
 	<img src="docs/screenshots/game-rainbow-blocks.png" alt="彩虹方块小游戏" width="32%" />
-	<img src="docs/screenshots/game-tiny-race.png" alt="小小赛车小游戏" width="32%" />
+	<img src="docs/screenshots/game-tiny-race.png" alt="弯道赛车小游戏" width="32%" />
 </p>
 
-| 雷光飞行 | 彩虹方块 | 小小赛车 |
-| --- | --- | --- |
-| 躲避云团、收集星芽 | 移动、旋转和消除彩色方块 | 换车道、避障和收集星芽 |
+| 雷光飞行 | 打地鼠 | 彩虹方块 | 弯道赛车 |
+| --- | --- | --- | --- |
+| 自动射击、三波敌机、护盾/火力/雷暴道具 | 金鼠、头盔鼠、时钟鼠、炸弹和连击 | 移动、旋转和消除彩色方块 | 过弯、金币、护盾/吸附/涡轮道具和路障 |
 
 ## 功能
 
 - 探索地图：三个学习世界各有 5 个节点，每个节点包含 6-10 道挑战。
 - 成长反馈：首次完成节点可获得星芽与伙伴碎片；每个世界收集 4 枚碎片可解锁一位伙伴。
 - 学习馆：每类练习都有本地图片、三选一题卡、一次温和提示与可选系统朗读。
-- 放松站：三种 1-3 分钟的轻量小游戏，支持儿童触控、键盘和手柄操作。
+- 放松站：四种 1-3 分钟的轻量小游戏，支持儿童触控、键盘和手柄操作。
 
 ## 隐私与声音
 
@@ -111,6 +114,7 @@ npm run assets:learning
 
 - `src/config/`：世界、学习内容和 Phaser 配置。
 - `src/scenes/`：探索、学习、伙伴、奖励和放松游戏场景。
+- `src/scenes/RelaxationHubScene.ts`、`ThunderFlightScene.ts`、`WhackAMoleScene.ts`、`RainbowBlocksScene.ts`、`TinyRaceScene.ts`：四种放松小游戏。
 - `src/store/`：本地进度、星芽、伙伴碎片和音频状态。
 - `public/assets/openmoji/`：本地学习图片和许可说明。
 - `docs/screenshots/`：README 中使用的真实游戏截图。

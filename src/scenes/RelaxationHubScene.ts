@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { GameAction, inputManager } from '../input/InputManager'
 
-type RelaxationGameKey = 'ThunderFlightScene' | 'RainbowBlocksScene' | 'TinyRaceScene'
+type RelaxationGameKey = 'ThunderFlightScene' | 'WhackAMoleScene' | 'RainbowBlocksScene' | 'TinyRaceScene'
 
 interface GameCard {
   panel: Phaser.GameObjects.Rectangle
@@ -9,9 +9,10 @@ interface GameCard {
 }
 
 const GAMES: { key: RelaxationGameKey; shortName: string; name: string; description: string; color: number; colorHex: string }[] = [
-  { key: 'ThunderFlightScene', shortName: '雷', name: '雷光飞行', description: '躲开云团，用闪电守护星芽', color: 0x5B7FE7, colorHex: '#5B7FE7' },
+  { key: 'ThunderFlightScene', shortName: '雷', name: '雷光飞行', description: '自动发射闪电，收集道具，守护星芽', color: 0x5B7FE7, colorHex: '#5B7FE7' },
+  { key: 'WhackAMoleScene', shortName: '鼠', name: '打地鼠', description: '看准再敲，金鼠加分，炸弹要躲开', color: 0x75A848, colorHex: '#75A848' },
   { key: 'RainbowBlocksScene', shortName: '块', name: '彩虹方块', description: '转一转、放一放，拼出彩虹线', color: 0xD765A0, colorHex: '#D765A0' },
-  { key: 'TinyRaceScene', shortName: '车', name: '小小赛车', description: '换车道、收星芽，平安到终点', color: 0xE88A31, colorHex: '#E88A31' },
+  { key: 'TinyRaceScene', shortName: '车', name: '弯道赛车', description: '过弯收金币，用道具越过路障', color: 0xE88A31, colorHex: '#E88A31' },
 ]
 
 export class RelaxationHubScene extends Phaser.Scene {
@@ -42,8 +43,15 @@ export class RelaxationHubScene extends Phaser.Scene {
       fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif',
     }).setOrigin(0.5)
 
+    const positions = [
+      { x: width * 0.3, y: 278 },
+      { x: width * 0.7, y: 278 },
+      { x: width * 0.3, y: 510 },
+      { x: width * 0.7, y: 510 },
+    ]
     GAMES.forEach((game, index) => {
-      this.cards.push(this.createCard(width * ((index + 1) / 4), 390, game, index))
+      const position = positions[index]
+      this.cards.push(this.createCard(position.x, position.y, game, index))
     })
 
     this.cleanupInput = inputManager.onInput((action) => this.handleInput(action))
@@ -79,32 +87,31 @@ export class RelaxationHubScene extends Phaser.Scene {
   }
 
   private createCard(x: number, y: number, game: typeof GAMES[number], index: number): GameCard {
-    const panel = this.add.rectangle(x, y, 320, 300, 0xFFFFFF, 0.96)
+    const panel = this.add.rectangle(x, y, 420, 194, 0xFFFFFF, 0.96)
       .setStrokeStyle(3, game.color, 0.45)
       .setInteractive({ useHandCursor: true })
-    const outline = this.add.rectangle(x, y, 332, 312, game.color, 0)
+    const outline = this.add.rectangle(x, y, 432, 206, game.color, 0)
       .setStrokeStyle(5, game.color, 0)
-    this.add.circle(x, y - 80, 43, game.color, 1)
-    this.add.text(x, y - 80, game.shortName, {
+    this.add.circle(x - 144, y, 42, game.color, 1)
+    this.add.text(x - 144, y, game.shortName, {
       fontSize: '31px',
       color: '#FFFFFF',
       fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif',
       fontStyle: 'bold',
     }).setOrigin(0.5)
-    this.add.text(x, y - 18, game.name, {
-      fontSize: '30px',
+    this.add.text(x - 62, y - 42, game.name, {
+      fontSize: '27px',
       color: '#304A66',
       fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif',
       fontStyle: 'bold',
-    }).setOrigin(0.5)
-    this.add.text(x, y + 31, game.description, {
+    }).setOrigin(0, 0.5)
+    this.add.text(x - 62, y - 1, game.description, {
       fontSize: '16px',
       color: '#647B8C',
       fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif',
-      wordWrap: { width: 248 },
-      align: 'center',
-    }).setOrigin(0.5)
-    this.add.text(x, y + 100, '轻松玩一局', {
+      wordWrap: { width: 238 },
+    }).setOrigin(0, 0.5)
+    this.add.text(x + 115, y + 53, '开始游戏', {
       fontSize: '18px',
       color: game.colorHex,
       fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif',
@@ -126,12 +133,18 @@ export class RelaxationHubScene extends Phaser.Scene {
       this.startGame(GAMES[this.selectedIndex].key)
       return
     }
-    if (action === GameAction.LEFT || action === GameAction.UP) {
-      this.updateSelection((this.selectedIndex - 1 + this.cards.length) % this.cards.length)
-    }
-    if (action === GameAction.RIGHT || action === GameAction.DOWN) {
-      this.updateSelection((this.selectedIndex + 1) % this.cards.length)
-    }
+    if (action === GameAction.LEFT) this.moveSelection(0, -1)
+    if (action === GameAction.RIGHT) this.moveSelection(0, 1)
+    if (action === GameAction.UP) this.moveSelection(-1, 0)
+    if (action === GameAction.DOWN) this.moveSelection(1, 0)
+  }
+
+  private moveSelection(rowDelta: number, columnDelta: number) {
+    const row = Math.floor(this.selectedIndex / 2)
+    const column = this.selectedIndex % 2
+    const nextRow = Phaser.Math.Wrap(row + rowDelta, 0, 2)
+    const nextColumn = Phaser.Math.Wrap(column + columnDelta, 0, 2)
+    this.updateSelection(nextRow * 2 + nextColumn)
   }
 
   private updateSelection(index: number) {
