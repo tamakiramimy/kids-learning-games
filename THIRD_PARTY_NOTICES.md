@@ -21,6 +21,14 @@ child-friendly “彩虹方块” game. Phaser renders the interface and control
 - Source: https://github.com/petelinmn/tetris-engine
 - License: ISC
 
+## Capacitor
+
+Capacitor provides the native iOS/iPadOS and Android application shells while
+the existing React and Phaser game bundle remains the shared application code.
+
+- Source: https://github.com/ionic-team/capacitor
+- License: MIT
+
 ## Design References
 
 The implementation uses original project code. The following public projects
@@ -28,4 +36,5 @@ were reviewed for game-design and interaction patterns only; no source code or
 artwork was copied into this repository.
 
 - JavaScript Tetris by Jake Gordon, MIT: https://github.com/jakesgordon/javascript-tetris
+- JavaScript Racer by Jake Gordon, MIT: https://github.com/jakesgordon/javascript-racer
 - Kenney Racing Pack, CC0: https://kenney.nl/assets/racing-pack

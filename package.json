@@ -2,6 +2,8 @@
   "name": "kids-learning-games",
   "private": true,
   "version": "0.0.0",
+  "description": "Offline learning adventures and gentle games for children aged 3 to 6.",
+  "author": "tamakiramimy",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
@@ -9,6 +11,13 @@
     "dev:electron": "concurrently \"vite\" \"wait-on http://localhost:3000 && NODE_ENV=development electron .\"",
     "build": "tsc -b && vite build",
     "build:electron": "npm run build && electron-builder --mac --win",
+    "build:electron:mac:x64": "npm run build && electron-builder --mac --x64 --publish never",
+    "build:electron:mac:arm64": "npm run build && electron-builder --mac --arm64 --publish never",
+    "build:electron:win:x64": "npm run build && electron-builder --win --x64 --publish never",
+    "build:electron:win:arm64": "npm run build && electron-builder --win --arm64 --publish never",
+    "mobile:sync": "npm run build && cap sync",
+    "mobile:android": "npm run mobile:sync && cap build android",
+    "mobile:ios": "npm run mobile:sync && cap build ios",
     "assets:learning": "bash scripts/download-learning-assets.sh",
     "lint": "oxlint",
     "test:generators": "node --experimental-strip-types --experimental-specifier-resolution=node scripts/verify-generators.ts",
@@ -24,6 +33,10 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/cli": "^8.5.0",
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/ios": "^8.5.0",
     "@tailwindcss/vite": "^4.3.1",
     "@types/howler": "^2.2.13",
     "@types/node": "^24.13.2",
@@ -56,10 +69,12 @@
     ],
     "mac": {
       "target": "dmg",
-      "category": "public.app-category.education"
+      "category": "public.app-category.education",
+      "icon": "public/app-icon.svg"
     },
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "public/app-icon.svg"
     }
   }
 }

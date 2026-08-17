@@ -16,6 +16,10 @@ coverage
 playwright-report
 test-results
 Temp-ChildrenGames
+android/.gradle
+android/app/build
+ios/build
+ios/DerivedData
 
 # Local agent and environment data
 .claude

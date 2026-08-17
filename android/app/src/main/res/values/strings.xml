@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">星芽奇旅</string>
+    <string name="title_activity_main">星芽奇旅</string>
+    <string name="package_name">com.xingya.kidslearning</string>
+    <string name="custom_url_scheme">com.xingya.kidslearning</string>
+</resources>

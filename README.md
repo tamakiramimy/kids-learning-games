@@ -2,7 +2,7 @@
 
 一个面向 3-6 岁儿童的离线学习游戏项目。孩子可以在探索地图中完成数学、比较和拼音挑战，也可以进入学习馆认识汉字、英语和古诗，或在放松站玩轻量小游戏。
 
-**项目类型：** React + TypeScript + Phaser + Electron
+**项目类型：** React + TypeScript + Phaser + Electron + Capacitor
 
 ## 游戏截图
 
@@ -92,13 +92,64 @@ npm run test:generators
 - `npm run test:learning`：学习内容、答案选项和本地图片资源完整性检查。
 - `npm run test:generators`：随机题目边界检查。
 - `npm run dev:electron`：启动 Electron 桌面开发模式。
-- `npm run build:electron`：构建 macOS 与 Windows 桌面包。
+- `npm run build:electron`：构建当前机器支持的 macOS 与 Windows 桌面包。
+
+## 桌面与移动端构建
+
+桌面端由 Electron 打包，移动端由 Capacitor 复用同一份 React 和 Phaser 游戏代码。iPhone、iPad、Android 手机和 Android 平板均使用横屏界面，并会避开刘海和系统安全区。
+
+```bash
+# 桌面端：按目标架构分别打包
+npm run build:electron:mac:arm64
+npm run build:electron:mac:x64
+npm run build:electron:win:arm64
+npm run build:electron:win:x64
+
+# 先构建 Web 并同步到两个原生工程
+npm run mobile:sync
+
+# 本机原生构建，需要 Android Studio/Java 21 或 Xcode
+npm run mobile:android
+npm run mobile:ios
+```
+
+Android 原生工程在 `android/`，iOS/iPadOS 工程在 `ios/App/`。第一次打开时可分别使用 Android Studio 和 Xcode 选择模拟器或真机；正式商店包必须由各自平台的签名证书生成。
+
+## GitHub Actions 制品
+
+`.github/workflows/verify.yml` 会在 `main` 推送和 Pull Request 上运行依赖审计、静态检查、构建、学习内容测试、题目生成测试、无声 UI 回归与 Capacitor 同步检查。
+
+`.github/workflows/build-artifacts.yml` 可在 Actions 页面手动触发，也会在推送 `v*` 标签时触发，分别上传以下构建制品：
+
+- macOS x64 与 arm64（DMG）
+- Windows x64 与 arm64（安装包）
+- Android 通用 Debug APK 与未签名 Release AAB
+- iOS/iPadOS 未签名 IPA，用于内部检查
+
+手动勾选 `sign_ios` 后，工作流会生成可安装的 iOS/iPadOS 签名 IPA。执行前需要在仓库 Secrets 中配置：
+
+- `IOS_CERTIFICATE_BASE64`
+- `IOS_CERTIFICATE_PASSWORD`
+- `IOS_PROVISIONING_PROFILE_BASE64`
+- `IOS_EXPORT_OPTIONS_PLIST_BASE64`
+
+手动勾选 `sign_android` 后，工作流会生成签名 Android APK 与 AAB。执行前需要在仓库 Secrets 中配置：
+
+- `ANDROID_KEYSTORE_BASE64`
+- `ANDROID_KEYSTORE_PASSWORD`
+- `ANDROID_KEY_ALIAS`
+- `ANDROID_KEY_PASSWORD`
+
+未配置这些 Secrets 时，常规构建不会请求签名信息，也不会发布到应用商店。
 
 ## 操作
 
 - 鼠标或触摸：点击世界、学习卡、放松游戏和答案。
 - 键盘：方向键移动焦点，Enter 确认，Esc 返回，数字键 `1` 至 `4` 选择答案。
 - 手柄：方向键选择，A 确认，B 返回；X 打开放松站，Y 打开学习馆，R1 打开伙伴册。
+- 雷光飞行：鼠标或手指拖动飞船；方向键或手柄摇杆可做二维移动；空格或 J 使用雷暴。
+- 打地鼠：点击或轻触洞口；方向键或手柄选择洞位，Enter/A 敲击。
+- 星芽拉力赛：轻触赛道直接选车道；方向键或手柄切换车道，Enter/A 使用涡轮。
 
 ## 素材与第三方声明
 
@@ -124,3 +175,5 @@ npm run assets:learning
 ## 发布前说明
 
 “星芽奇旅”是当前产品品牌名。正式上架前仍应完成应用商店、域名和商标近似检索。桌面应用标识 `com.kids.learn-game` 暂未变更，以避免已有安装用户的升级路径中断。
+
+移动应用标识为 `com.xingya.kidslearning`。`npm audit --omit=dev` 当前为零漏洞；全量审计仍会报告 Capacitor CLI 的开发期 `xcode -> uuid` 上游告警，Capacitor `8.5.0` 暂无兼容的自动修复。该链不进入浏览器、Electron 或移动端运行时产物，升级 Capacitor CLI 后应重新执行审计。

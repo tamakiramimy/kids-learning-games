@@ -1,0 +1,44 @@
+name: Verify
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: npm ci
+      - run: npm audit --omit=dev --audit-level=moderate
+      - run: npm run lint
+      - run: npm run build
+      - run: npm run test:learning
+      - run: npm run test:generators
+      - run: python3 -m pip install playwright
+      - run: python3 -m playwright install --with-deps chromium
+      - name: Run silent UI regression
+        run: |
+          npm run dev -- --host 127.0.0.1 > vite.log 2>&1 &
+          vite_pid=$!
+          trap 'kill "$vite_pid"' EXIT
+          npx wait-on http://127.0.0.1:3000
+          UI_BASE_URL=http://127.0.0.1:3000/ python3 scripts/verify-ui.py
+      - run: npm run mobile:sync

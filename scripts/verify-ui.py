@@ -1,8 +1,9 @@
+import os
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 
-BASE_URL = "http://127.0.0.1:3001/"
+BASE_URL = os.environ.get("UI_BASE_URL", "http://127.0.0.1:3001/")
 OUTPUT_DIR = Path("Temp-ChildrenGames/temp/ui-verification")
 WORLD_CENTERS = (320, 640, 960)
 WORLD_SCENES = ("MathGardenScene", "ForestCompareScene", "SoundHarborScene")
@@ -187,6 +188,13 @@ def verify_relaxation_games(browser):
         wait_for_scene(page, scene_key)
         page.wait_for_timeout(TRANSITION_SETTLE_MS)
         if scene_key == "ThunderFlightScene":
+            assert page.evaluate(
+                "window.__xingyaGame.scene.getScene('ThunderFlightScene').gameStarted"
+            ) is False
+            page.mouse.click(640, 394)
+            page.wait_for_function(
+                "window.__xingyaGame.scene.getScene('ThunderFlightScene').gameStarted"
+            )
             before_x = page.evaluate(
                 "window.__xingyaGame.scene.getScene('ThunderFlightScene').player.x"
             )
@@ -198,7 +206,22 @@ def verify_relaxation_games(browser):
             page.wait_for_function(
                 "window.__xingyaGame.scene.getScene('ThunderFlightScene').enemyBullets.length > 0"
             )
+            page.keyboard.press("p")
+            page.wait_for_function(
+                "window.__xingyaGame.scene.getScene('ThunderFlightScene').paused"
+            )
+            page.keyboard.press("Enter")
+            page.wait_for_function(
+                "!window.__xingyaGame.scene.getScene('ThunderFlightScene').paused"
+            )
         elif scene_key == "WhackAMoleScene":
+            assert page.evaluate(
+                "window.__xingyaGame.scene.getScene('WhackAMoleScene').gameStarted"
+            ) is False
+            page.mouse.click(640, 394)
+            page.wait_for_function(
+                "window.__xingyaGame.scene.getScene('WhackAMoleScene').gameStarted"
+            )
             mole_state = page.evaluate(
                 """() => {
                   const scene = window.__xingyaGame.scene.getScene('WhackAMoleScene')

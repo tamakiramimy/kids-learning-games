@@ -1,0 +1,220 @@
+name: Build App Artifacts
+
+on:
+  workflow_dispatch:
+    inputs:
+      sign_android:
+        description: Build signed Android APK and AAB using configured signing secrets
+        required: false
+        default: false
+        type: boolean
+      sign_ios:
+        description: Build an installable signed iOS IPA using configured signing secrets
+        required: false
+        default: false
+        type: boolean
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: artifacts-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  desktop:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS x64
+            os: macos-14
+            command: npm run build:electron:mac:x64
+            artifact: xingya-macos-x64
+          - name: macOS arm64
+            os: macos-14
+            command: npm run build:electron:mac:arm64
+            artifact: xingya-macos-arm64
+          - name: Windows x64
+            os: windows-latest
+            command: npm run build:electron:win:x64
+            artifact: xingya-windows-x64
+          - name: Windows arm64
+            os: windows-latest
+            command: npm run build:electron:win:arm64
+            artifact: xingya-windows-arm64
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: ${{ matrix.command }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: release/**
+          if-no-files-found: error
+
+  android:
+    name: Android phone and tablet
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci
+      - run: npm run mobile:sync
+      - run: ./gradlew --no-daemon assembleDebug bundleRelease
+        working-directory: android
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xingya-android-universal-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xingya-android-universal-aab
+          path: android/app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
+
+  android-signed:
+    name: Android signed APK and AAB
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.sign_android }}
+    runs-on: ubuntu-latest
+    environment: mobile-signing
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci
+      - run: npm run mobile:sync
+      - name: Import Android signing material
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          test -n "$ANDROID_KEYSTORE_BASE64" && test -n "$ANDROID_KEYSTORE_PASSWORD" && test -n "$ANDROID_KEY_ALIAS" && test -n "$ANDROID_KEY_PASSWORD"
+          keystore_path="$RUNNER_TEMP/xingya-release.jks"
+          printf %s "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore_path"
+          echo "ANDROID_KEYSTORE_PATH=$keystore_path" >> "$GITHUB_ENV"
+      - name: Build signed Android artifacts
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew --no-daemon assembleRelease bundleRelease
+        working-directory: android
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xingya-android-signed-apk
+          path: android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xingya-android-signed-aab
+          path: android/app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
+
+  ios:
+    name: iOS and iPadOS unsigned IPA
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run mobile:sync
+      - name: Build an unsigned iOS archive
+        run: |
+          xcodebuild \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath "$RUNNER_TEMP/xingya-ios.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO \
+            archive
+          mkdir -p "$RUNNER_TEMP/ios-artifact/Payload"
+          cp -R "$RUNNER_TEMP/xingya-ios.xcarchive/Products/Applications/App.app" "$RUNNER_TEMP/ios-artifact/Payload/App.app"
+          ditto -c -k --sequesterRsrc --keepParent "$RUNNER_TEMP/ios-artifact/Payload" "$RUNNER_TEMP/xingya-ios-ipad-unsigned.ipa"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xingya-ios-ipados-unsigned-ipa
+          path: ${{ runner.temp }}/xingya-ios-ipad-unsigned.ipa
+          if-no-files-found: error
+
+  ios-signed:
+    name: iOS and iPadOS signed IPA
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.sign_ios }}
+    runs-on: macos-14
+    environment: mobile-signing
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run mobile:sync
+      - name: Import signing material
+        env:
+          IOS_CERTIFICATE_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+          IOS_EXPORT_OPTIONS_PLIST_BASE64: ${{ secrets.IOS_EXPORT_OPTIONS_PLIST_BASE64 }}
+        run: |
+          test -n "$IOS_CERTIFICATE_BASE64" && test -n "$IOS_CERTIFICATE_PASSWORD" && test -n "$IOS_PROVISIONING_PROFILE_BASE64" && test -n "$IOS_EXPORT_OPTIONS_PLIST_BASE64"
+          certificate_path="$RUNNER_TEMP/build-certificate.p12"
+          profile_path="$RUNNER_TEMP/build-profile.mobileprovision"
+          export_options_path="$RUNNER_TEMP/ExportOptions.plist"
+          keychain_path="$RUNNER_TEMP/app-signing.keychain-db"
+          echo -n "$IOS_CERTIFICATE_BASE64" | base64 --decode > "$certificate_path"
+          echo -n "$IOS_PROVISIONING_PROFILE_BASE64" | base64 --decode > "$profile_path"
+          echo -n "$IOS_EXPORT_OPTIONS_PLIST_BASE64" | base64 --decode > "$export_options_path"
+          security create-keychain -p "" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "" "$keychain_path"
+          security import "$certificate_path" -P "$IOS_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$keychain_path"
+          security list-keychain -d user -s "$keychain_path"
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp "$profile_path" "$HOME/Library/MobileDevice/Provisioning Profiles"
+      - name: Archive and export IPA
+        run: |
+          xcodebuild \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -archivePath "$RUNNER_TEMP/xingya-ios-signed.xcarchive" \
+            archive
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/xingya-ios-signed.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/xingya-ios-signed"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xingya-ios-ipados-signed-ipa
+          path: ${{ runner.temp }}/xingya-ios-signed/*.ipa
+          if-no-files-found: error

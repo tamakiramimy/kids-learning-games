@@ -5,6 +5,7 @@ export const GameAction = {
   RIGHT: 'right',
   CONFIRM: 'confirm',
   BACK: 'back',
+  PAUSE: 'pause',
   OPTION_1: 'option1',
   OPTION_2: 'option2',
   OPTION_3: 'option3',
@@ -31,6 +32,9 @@ export class InputManager {
     ArrowRight: GameAction.RIGHT,
     Enter: GameAction.CONFIRM,
     Escape: GameAction.BACK,
+    KeyP: GameAction.PAUSE,
+    Space: GameAction.OPTION_1,
+    KeyJ: GameAction.OPTION_1,
     Digit1: GameAction.OPTION_1,
     Digit2: GameAction.OPTION_2,
     Digit3: GameAction.OPTION_3,
@@ -52,6 +56,7 @@ export class InputManager {
     window.addEventListener('gamepadconnected', this.onGamepadConnected)
     window.addEventListener('gamepaddisconnected', this.onGamepadDisconnected)
     window.addEventListener('touchstart', this.onTouchStart, { passive: false })
+    this.detectConnectedGamepad()
     this.pollInterval = window.setInterval(() => this.pollGamepad(), 16)
   }
 
@@ -62,6 +67,11 @@ export class InputManager {
     window.removeEventListener('gamepaddisconnected', this.onGamepadDisconnected)
     window.removeEventListener('touchstart', this.onTouchStart)
     if (this.pollInterval) clearInterval(this.pollInterval)
+    this.pollInterval = null
+    this.gamepadConnected = false
+    this.gamepadIndex = null
+    this.prevButtons.clear()
+    this.prevDpad = { up: false, down: false, left: false, right: false }
   }
 
   onInput(cb: InputCallback) {
@@ -73,6 +83,22 @@ export class InputManager {
     return this.gamepadConnected
   }
 
+  getDirection() {
+    const gamepad = this.getActiveGamepad()
+    const gamepadX = gamepad
+      ? PhaserLikeClamp((gamepad.axes[0] ?? 0) || (gamepad.buttons[15]?.pressed ? 1 : gamepad.buttons[14]?.pressed ? -1 : 0))
+      : 0
+    const gamepadY = gamepad
+      ? PhaserLikeClamp((gamepad.axes[1] ?? 0) || (gamepad.buttons[13]?.pressed ? 1 : gamepad.buttons[12]?.pressed ? -1 : 0))
+      : 0
+    const keyboardX = (this.keysDown.has('ArrowRight') ? 1 : 0) - (this.keysDown.has('ArrowLeft') ? 1 : 0)
+    const keyboardY = (this.keysDown.has('ArrowDown') ? 1 : 0) - (this.keysDown.has('ArrowUp') ? 1 : 0)
+    return {
+      x: keyboardX || gamepadX,
+      y: keyboardY || gamepadY,
+    }
+  }
+
   private emit(action: GameAction) {
     for (const cb of this.callbacks) cb(action)
   }
@@ -81,7 +107,10 @@ export class InputManager {
     if (this.keysDown.has(e.code)) return
     this.keysDown.add(e.code)
     const action = this.KEY_MAP[e.code]
-    if (action) this.emit(action)
+    if (action) {
+      e.preventDefault()
+      this.emit(action)
+    }
   }
 
   private onKeyUp = (e: KeyboardEvent) => {
@@ -98,9 +127,15 @@ export class InputManager {
     this.gamepadIndex = null
   }
 
+  private detectConnectedGamepad() {
+    const gamepad = navigator.getGamepads?.().find((item) => item !== null)
+    if (!gamepad) return
+    this.gamepadConnected = true
+    this.gamepadIndex = gamepad.index
+  }
+
   private pollGamepad() {
-    if (this.gamepadIndex === null) return
-    const gamepad = navigator.getGamepads()[this.gamepadIndex]
+    const gamepad = this.getActiveGamepad()
     if (!gamepad) return
 
     // D-pad
@@ -131,10 +166,19 @@ export class InputManager {
     }
   }
 
+  private getActiveGamepad() {
+    if (this.gamepadIndex === null) return null
+    return navigator.getGamepads?.()[this.gamepadIndex] ?? null
+  }
+
   private onTouchStart = () => {
     // Touch is handled by Phaser's built-in input system
     // We just ensure the AudioContext is unlocked on first touch
   }
+}
+
+function PhaserLikeClamp(value: number) {
+  return Math.max(-1, Math.min(1, value))
 }
 
 export const inputManager = new InputManager()
