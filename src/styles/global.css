@@ -1,0 +1,33 @@
+@import "tailwindcss";
+
+@theme {
+  --color-kids-red: #FF5252;
+  --color-kids-yellow: #FFD740;
+  --color-kids-blue: #448AFF;
+  --color-kids-green: #69F0AE;
+  --color-kids-purple: #B388FF;
+  --color-kids-orange: #FF9100;
+  --color-kids-pink: #FF80AB;
+  --color-kids-bg: #FFF8E1;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #FFF8E1;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+canvas {
+  display: block;
+}

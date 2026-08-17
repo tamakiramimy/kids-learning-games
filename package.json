@@ -1,0 +1,65 @@
+{
+  "name": "xingya-quest",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "vite",
+    "dev:electron": "concurrently \"vite\" \"wait-on http://localhost:3000 && NODE_ENV=development electron .\"",
+    "build": "tsc -b && vite build",
+    "build:electron": "npm run build && electron-builder --mac --win",
+    "assets:learning": "bash scripts/download-learning-assets.sh",
+    "lint": "oxlint",
+    "test:generators": "node --experimental-strip-types --experimental-specifier-resolution=node scripts/verify-generators.ts",
+    "test:learning": "node --experimental-strip-types --experimental-specifier-resolution=node scripts/verify-learning-content.ts",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "howler": "^2.2.4",
+    "phaser": "^3.80.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "tetris-engine": "^1.2.18",
+    "zustand": "^5.0.14"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.1",
+    "@types/howler": "^2.2.13",
+    "@types/node": "^24.13.2",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.2",
+    "concurrently": "^10.0.5",
+    "electron": "^42.9.2",
+    "electron-builder": "^26.15.7",
+    "oxlint": "^1.69.0",
+    "tailwindcss": "^4.3.1",
+    "typescript": "~6.0.2",
+    "vite": "^8.2.1",
+    "wait-on": "^9.0.10"
+  },
+  "overrides": {
+    "@electron/get": {
+      "undici": "7.29.0"
+    }
+  },
+  "build": {
+    "appId": "com.kids.learn-game",
+    "productName": "星芽奇旅",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*"
+    ],
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.education"
+    },
+    "win": {
+      "target": "nsis"
+    }
+  }
+}
