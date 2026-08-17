@@ -53,7 +53,7 @@
 
 | 雷光飞行 | 打地鼠 | 彩虹方块 | 弯道赛车 |
 | --- | --- | --- | --- |
-| 自动射击、三波敌机、护盾/火力/雷暴道具 | 金鼠、头盔鼠、时钟鼠、炸弹和连击 | 移动、旋转和消除彩色方块 | 过弯、金币、护盾/吸附/涡轮道具和路障 |
+| 自动射击、三波敌机、护盾/火力/雷暴道具 | 金鼠、头盔鼠、时钟鼠、炸弹和连击 | 移动、旋转和消除彩色方块 | 3D 三车道、交通车流、金币、护盾/吸附/氮气道具 |
 
 ## 功能
 
@@ -149,7 +149,7 @@ Android 原生工程在 `android/`，iOS/iPadOS 工程在 `ios/App/`。第一次
 - 手柄：方向键选择，A 确认，B 返回；X 打开放松站，Y 打开学习馆，R1 打开伙伴册。
 - 雷光飞行：鼠标或手指拖动飞船；方向键或手柄摇杆可做二维移动；空格或 J 使用雷暴。
 - 打地鼠：点击或轻触洞口；方向键或手柄选择洞位，Enter/A 敲击。
-- 星芽拉力赛：轻触赛道直接选车道；方向键或手柄切换车道，Enter/A 使用涡轮。
+- 星芽拉力赛：轻触赛道直接选车道；`A`/`D`、方向键或手柄切换车道，空格/Enter/A 使用氮气。
 
 ## 素材与第三方声明
 
@@ -165,7 +165,7 @@ npm run assets:learning
 
 - `src/config/`：世界、学习内容和 Phaser 配置。
 - `src/scenes/`：探索、学习、伙伴、奖励和放松游戏场景。
-- `src/scenes/RelaxationHubScene.ts`、`ThunderFlightScene.ts`、`WhackAMoleScene.ts`、`RainbowBlocksScene.ts`、`TinyRaceScene.ts`：四种放松小游戏。
+- `src/scenes/RelaxationHubScene.ts`、`ThunderFlightScene.ts`、`WhackAMoleScene.ts`、`RainbowBlocksScene.ts`、`TinyRaceScene.ts`：四种放松小游戏；`ThreeRaceRenderer.ts` 提供拉力赛的 Three.js 低多边形 3D 世界。
 - `src/store/`：本地进度、星芽、伙伴碎片和音频状态。
 - `public/assets/openmoji/`：本地学习图片和许可说明。
 - `docs/screenshots/`：README 中使用的真实游戏截图。

@@ -14,6 +14,9 @@ export function GameContainer() {
     const container = containerRef.current
     const game = new Phaser.Game(createPhaserConfig(container))
     gameRef.current = game
+    game.canvas.style.position = 'absolute'
+    game.canvas.style.zIndex = '1'
+    game.canvas.style.backgroundColor = 'transparent'
     if (import.meta.env.DEV) {
       const debugWindow = window as Window & {
         __xingyaGame?: Phaser.Game
@@ -28,16 +31,23 @@ export function GameContainer() {
     const refreshScale = () => {
       game.scale.refresh()
       window.requestAnimationFrame(refreshInputBounds)
+      window.requestAnimationFrame(() => window.requestAnimationFrame(refreshInputBounds))
     }
     const animationFrame = window.requestAnimationFrame(refreshInputBounds)
     const resizeObserver = new ResizeObserver(refreshScale)
     resizeObserver.observe(container)
+    window.addEventListener('resize', refreshScale)
+    window.addEventListener('orientationchange', refreshScale)
+    window.visualViewport?.addEventListener('resize', refreshScale)
     game.canvas.addEventListener('pointerdown', refreshInputBounds, true)
     game.canvas.addEventListener('touchstart', refreshInputBounds, true)
 
     return () => {
       window.cancelAnimationFrame(animationFrame)
       resizeObserver.disconnect()
+      window.removeEventListener('resize', refreshScale)
+      window.removeEventListener('orientationchange', refreshScale)
+      window.visualViewport?.removeEventListener('resize', refreshScale)
       game.canvas.removeEventListener('pointerdown', refreshInputBounds, true)
       game.canvas.removeEventListener('touchstart', refreshInputBounds, true)
       inputManager.stop()

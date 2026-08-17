@@ -29,6 +29,15 @@ the existing React and Phaser game bundle remains the shared application code.
 - Source: https://github.com/ionic-team/capacitor
 - License: MIT
 
+## Three.js
+
+Three.js renders the original low-poly 3D world used by the “星芽拉力赛”
+game. Phaser continues to provide the game navigation, HUD, touch controls, and
+input integration.
+
+- Source: https://github.com/mrdoob/three.js
+- License: MIT
+
 ## Design References
 
 The implementation uses original project code. The following public projects
@@ -37,4 +46,5 @@ artwork was copied into this repository.
 
 - JavaScript Tetris by Jake Gordon, MIT: https://github.com/jakesgordon/javascript-tetris
 - JavaScript Racer by Jake Gordon, MIT: https://github.com/jakesgordon/javascript-racer
+- 3D racing avoidance design article: https://www.cnblogs.com/jzssuanfa/p/19975594
 - Kenney Racing Pack, CC0: https://kenney.nl/assets/racing-pack

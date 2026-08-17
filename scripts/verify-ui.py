@@ -255,6 +255,16 @@ def verify_relaxation_games(browser):
             before_lane = page.evaluate(
                 "window.__xingyaGame.scene.getScene('TinyRaceScene').laneIndex"
             )
+            page.keyboard.press("a")
+            page.wait_for_function(
+                "beforeLane => window.__xingyaGame.scene.getScene('TinyRaceScene').laneIndex < beforeLane",
+                arg=before_lane,
+            )
+            page.keyboard.press("d")
+            page.wait_for_function(
+                "beforeLane => window.__xingyaGame.scene.getScene('TinyRaceScene').laneIndex === beforeLane",
+                arg=before_lane,
+            )
             page.mouse.click(130, 666)
             page.wait_for_function(
                 "beforeLane => window.__xingyaGame.scene.getScene('TinyRaceScene').laneIndex < beforeLane",
@@ -264,16 +274,26 @@ def verify_relaxation_games(browser):
                 """() => {
                   const scene = window.__xingyaGame.scene.getScene('TinyRaceScene')
                   return {
-                    roadWidth: scene.roadWidthAt(scene.playerY),
+                    rendererReady: Boolean(scene.raceRenderer),
+                    laneSpacing: scene.raceRenderer.laneSpacing,
+                    threeCanvasCount: document.querySelectorAll('canvas.race-three-canvas').length,
                     finishDistance: scene.finishDistance,
                   }
                 }"""
             )
-            assert road_state["roadWidth"] > 0
+            assert road_state["rendererReady"]
+            assert road_state["laneSpacing"] > 0
+            assert road_state["threeCanvasCount"] == 1
             assert road_state["finishDistance"] > 0
+            page.mouse.click(640, 420)
+            page.wait_for_function(
+                "window.__xingyaGame.scene.getScene('TinyRaceScene').laneIndex === 1"
+            )
         page.screenshot(path=str(OUTPUT_DIR / f"relaxation-{index}.png"))
         page.mouse.click(72, 42)
         wait_for_scene(page, "RelaxationHubScene")
+        if scene_key == "TinyRaceScene":
+            page.wait_for_function("document.querySelectorAll('canvas.race-three-canvas').length === 0")
 
     page.mouse.click(72, 48)
     wait_for_scene(page, "AdventureMapScene")
@@ -347,6 +367,35 @@ def verify_narrow_landscape(browser):
     context.close()
 
 
+def verify_race_narrow_landscape(browser):
+    context = browser.new_context(viewport={"width": 844, "height": 390})
+    page = context.new_page()
+    page.goto(BASE_URL, wait_until="networkidle")
+    page.wait_for_selector("canvas")
+    wait_for_scene(page, "AdventureMapScene")
+    page.evaluate(
+        """() => {
+          window.__xingyaGame.scene.stop('AdventureMapScene')
+          window.__xingyaGame.scene.start('TinyRaceScene')
+        }"""
+    )
+    wait_for_scene(page, "TinyRaceScene")
+    page.wait_for_function(
+        "window.__xingyaGame.scene.getScene('TinyRaceScene').raceRenderer"
+    )
+    page.wait_for_timeout(TRANSITION_SETTLE_MS)
+    phaser_canvas = page.locator("#game-container > canvas:not(.race-three-canvas)").bounding_box()
+    three_canvas = page.locator("canvas.race-three-canvas").bounding_box()
+    assert phaser_canvas is not None
+    assert three_canvas is not None
+    assert abs(phaser_canvas["x"] - three_canvas["x"]) < 1
+    assert abs(phaser_canvas["y"] - three_canvas["y"]) < 1
+    assert abs(phaser_canvas["width"] - three_canvas["width"]) < 1
+    assert abs(phaser_canvas["height"] - three_canvas["height"]) < 1
+    page.screenshot(path=str(OUTPUT_DIR / "race-narrow-landscape.png"))
+    context.close()
+
+
 def main():
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     with sync_playwright() as playwright:
@@ -367,6 +416,7 @@ def main():
         verify_relaxation_games(browser)
         verify_order_challenge(browser)
         verify_narrow_landscape(browser)
+        verify_race_narrow_landscape(browser)
         context.close()
         browser.close()
     print(f"UI verification passed. Screenshots: {OUTPUT_DIR}")

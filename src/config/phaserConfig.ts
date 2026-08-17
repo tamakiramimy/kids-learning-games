@@ -19,6 +19,7 @@ export function createPhaserConfig(parent: string | HTMLElement): Phaser.Types.C
     type: Phaser.AUTO,
     parent,
     backgroundColor: '#FFF8E1',
+    transparent: true,
     scale: {
       mode: Phaser.Scale.FIT,
       autoCenter: Phaser.Scale.CENTER_BOTH,
