@@ -74,29 +74,7 @@ jobs:
           arch: x86_64
           profile: pixel_2
           disable-animations: true
-          script: |
-            adb install android/app/build/outputs/apk/debug/app-debug.apk
-            adb shell svc wifi disable
-            adb shell svc data disable
-            adb logcat -c
-            adb shell am start -W -n com.xingya.kidslearning/.MainActivity
-            ready=false
-            for attempt in $(seq 1 30); do
-              if adb logcat -d -v brief | grep -Fq '[xingya] startup-ready AdventureMapScene'; then
-                ready=true
-                break
-              fi
-              sleep 1
-            done
-            adb logcat -d -v threadtime > android-startup.log
-            if grep -Eq 'JavaScript Error|Uncaught TypeError|FATAL EXCEPTION' android-startup.log; then
-              echo 'Android startup emitted a fatal error.'
-              exit 1
-            fi
-            if [ "$ready" != true ]; then
-              echo 'Android did not reach AdventureMapScene while offline.'
-              exit 1
-            fi
+          script: bash scripts/verify-android-startup.sh
       - name: Upload Android startup log
         if: always()
         uses: actions/upload-artifact@v7
