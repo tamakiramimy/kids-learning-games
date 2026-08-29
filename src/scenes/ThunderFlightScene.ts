@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { audioManager } from '../audio/AudioManager'
 import { GameAction, inputManager } from '../input/InputManager'
 import { useGameStore } from '../store/gameStore'
 
@@ -336,6 +337,7 @@ export class ThunderFlightScene extends Phaser.Scene {
       if (hitEnemy) {
         bullet.destroy()
         hitEnemy.health -= 1
+        audioManager.playEffect('hit')
         this.showImpact(hitEnemy.sprite.x, hitEnemy.sprite.y, 0xB7F3FF)
         if (hitEnemy.health <= 0) this.destroyEnemy(hitEnemy)
         return false
@@ -397,6 +399,7 @@ export class ThunderFlightScene extends Phaser.Scene {
     const multiplier = 1 + Math.floor(this.combo / 5) * 0.25
     this.score += Math.round(enemy.points * multiplier)
     this.defeatedInWave += 1
+    audioManager.playEffect('correct')
     this.showImpact(enemy.sprite.x, enemy.sprite.y, 0xFFE58A)
     enemy.sprite.destroy()
     if (Math.random() < 0.28) this.spawnItem()
@@ -416,6 +419,7 @@ export class ThunderFlightScene extends Phaser.Scene {
     if (kind === 'turbo') this.turboTime = 6
     if (kind === 'magnet') this.magnetTime = 7
     if (kind === 'star') this.score += 2
+    audioManager.playEffect('collect')
     this.showFeedback(labels[kind], '#A9F5DB')
   }
 
@@ -427,6 +431,7 @@ export class ThunderFlightScene extends Phaser.Scene {
       return
     }
     this.goalForWave = 5 + this.wave * 2
+    audioManager.playEffect('success')
     this.showFeedback(`第 ${this.wave} 波开始！`, '#FFE58A')
     this.announceWave()
   }
@@ -448,10 +453,12 @@ export class ThunderFlightScene extends Phaser.Scene {
   private damagePlayer() {
     if (this.gameEnded) return
     if (this.shieldTime > 0) {
+      audioManager.playEffect('hit')
       this.showFeedback('护盾挡住了撞击', '#A9F5DB')
       return
     }
     this.combo = 0
+    audioManager.playEffect('wrong')
     this.player.setAlpha(0.35)
     this.cameras.main.shake(180, 0.008)
     this.tweens.add({ targets: this.player, alpha: 1, duration: 300 })
@@ -563,6 +570,7 @@ export class ThunderFlightScene extends Phaser.Scene {
   private startGame(difficulty: FlightDifficulty) {
     this.difficulty = difficulty
     this.gameStarted = true
+    audioManager.playEffect('tap')
     this.storms = difficulty === 'easy' ? 3 : 2
     this.goalForWave = difficulty === 'hard' ? 8 : 6
     this.startOverlay?.destroy(true)
@@ -671,6 +679,7 @@ export class ThunderFlightScene extends Phaser.Scene {
     this.enemyEvent?.remove(false)
     this.itemEvent?.remove(false)
     this.fireEvent?.remove(false)
+    audioManager.playEffect(success ? 'success' : 'fail')
     const starsEarned = success ? 3 : Math.min(2, Math.floor(this.score / 8))
     if (starsEarned > 0) useGameStore.getState().addStars(starsEarned)
     const panel = this.add.rectangle(this.scale.width / 2, this.scale.height / 2, 480, 240, 0xFFFFFF, 0.97)

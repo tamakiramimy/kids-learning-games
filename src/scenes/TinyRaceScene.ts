@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { audioManager } from '../audio/AudioManager'
 import { GameAction, inputManager } from '../input/InputManager'
 import { useGameStore } from '../store/gameStore'
 import { ThreeRaceRenderer } from './ThreeRaceRenderer'
@@ -280,42 +281,51 @@ export class TinyRaceScene extends Phaser.Scene {
       const gained = this.boostTime > 0 ? 2 : 1
       this.coins += gained
       this.score += gained * 60
+      audioManager.playEffect('collect')
       this.showFeedback(`金币 +${gained}`, '#FFD35C')
       return
     }
     if (entity.kind === 'barrier') {
       if (this.shieldTime > 0) {
         this.score += 80
+        audioManager.playEffect('hit')
         this.showFeedback('护盾撞开了障碍', '#82F1DD')
         return
       }
+      audioManager.playEffect('wrong')
       this.cameras.main.shake(220, 0.009)
       this.showFeedback('撞到障碍，没关系，继续前进！', '#FFB3A7')
       return
     }
     if (entity.kind === 'shield') {
       this.shieldTime = 7
+      audioManager.playEffect('collect')
       this.showFeedback('护盾开启 7 秒', '#82F1DD')
     }
     if (entity.kind === 'magnet') {
       this.magnetTime = 7
+      audioManager.playEffect('collect')
       this.showFeedback('金币吸附 7 秒', '#D6B6FF')
     }
     if (entity.kind === 'turbo') {
       this.boostCharges = Math.min(3, this.boostCharges + 1)
+      audioManager.playEffect('collect')
       this.showFeedback('获得氮气加速', '#FFD39B')
     }
   }
 
   private changeLane(direction: number) {
     if (this.tutorialOverlay || this.paused || this.gameEnded) return
-    this.laneIndex = Phaser.Math.Clamp(this.laneIndex + direction, 0, 2)
+    const nextLane = Phaser.Math.Clamp(this.laneIndex + direction, 0, 2)
+    if (nextLane !== this.laneIndex) audioManager.playEffect('move')
+    this.laneIndex = nextLane
   }
 
   private useBoost() {
     if (this.tutorialOverlay || this.paused || this.gameEnded || this.boostCharges <= 0 || this.boostTime > 0) return
     this.boostCharges -= 1
     this.boostTime = 4
+    audioManager.playEffect('success')
     this.showFeedback('氮气加速！金币双倍', '#FFD39B')
   }
 
@@ -399,6 +409,7 @@ export class TinyRaceScene extends Phaser.Scene {
     this.obstacleEvent.remove(false)
     this.coinEvent.remove(false)
     this.itemEvent.remove(false)
+    audioManager.playEffect(success ? 'success' : 'fail')
     const starsEarned = success ? Math.min(3, 1 + Math.floor(this.coins / 12)) : Math.min(2, Math.floor(this.coins / 8))
     if (starsEarned > 0) useGameStore.getState().addStars(starsEarned)
     const panel = this.add.rectangle(this.scale.width / 2, this.scale.height / 2, 480, 254, 0x102228, 0.98)

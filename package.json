@@ -1,7 +1,7 @@
 {
   "name": "kids-learning-games",
   "private": true,
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Offline learning adventures and gentle games for children aged 3 to 6.",
   "author": "tamakiramimy",
   "type": "module",
@@ -26,6 +26,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@capacitor-community/text-to-speech": "^8.0.2",
     "howler": "^2.2.4",
     "phaser": "^3.80.1",
     "react": "^19.2.7",

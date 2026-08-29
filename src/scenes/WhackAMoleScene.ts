@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { audioManager } from '../audio/AudioManager'
 import { GameAction, inputManager } from '../input/InputManager'
 import { useGameStore } from '../store/gameStore'
 
@@ -436,11 +437,13 @@ export class WhackAMoleScene extends Phaser.Scene {
     const slot = this.slots[index]
     if (!slot || slot.state !== 'rising' && slot.state !== 'up' || !slot.kind) {
       this.combo = 0
+      audioManager.playEffect('wrong')
       this.showFeedback('慢一点，等地鼠冒头再敲。', '#8A6A48')
       return
     }
     if (slot.kind === 'bomb') {
       this.combo = 0
+      audioManager.playEffect('fail')
       this.cameras.main.shake(180, 0.009)
       this.showFeedback('小心炸弹，没关系，继续敲！', '#C94C50')
       this.hideSlot(slot, true)
@@ -448,6 +451,7 @@ export class WhackAMoleScene extends Phaser.Scene {
     }
     slot.health -= 1
     this.hits += 1
+    audioManager.playEffect('hit')
     slot.mole.setScale(1.16, 0.8)
     this.tweens.add({ targets: slot.mole, scaleX: 1, scaleY: 1, duration: 130, ease: 'Back.easeOut' })
     if (slot.health > 0) {
@@ -460,6 +464,7 @@ export class WhackAMoleScene extends Phaser.Scene {
     const multiplier = 1 + Math.floor(this.combo / 4)
     const gained = detail.value * multiplier
     this.score += gained
+    audioManager.playEffect(slot.kind === 'gold' || slot.kind === 'clock' ? 'collect' : 'correct')
     if (slot.kind === 'clock') {
       this.timeLeft = Math.min(60, this.timeLeft + 3)
       this.showFeedback('+3 秒，继续加油！', '#377FA4')
@@ -477,6 +482,7 @@ export class WhackAMoleScene extends Phaser.Scene {
     this.attempts += 1
     this.combo = 0
     this.swingHammer()
+    audioManager.playEffect('wrong')
     this.showFeedback('看准洞口再敲！', '#8A6A48')
   }
 
@@ -558,6 +564,7 @@ export class WhackAMoleScene extends Phaser.Scene {
   private startGame(difficulty: MoleDifficulty) {
     this.difficulty = difficulty
     this.gameStarted = true
+    audioManager.playEffect('tap')
     this.roundDuration = difficulty === 'easy' ? 60 : difficulty === 'hard' ? 35 : 45
     this.timeLeft = this.roundDuration
     this.spawnTimer = 0.42
@@ -641,6 +648,7 @@ export class WhackAMoleScene extends Phaser.Scene {
   private finishGame() {
     if (this.gameEnded) return
     this.gameEnded = true
+    audioManager.playEffect(this.score > 0 ? 'success' : 'fail')
     const starsEarned = Math.min(3, Math.floor(this.score / 8))
     if (starsEarned > 0) useGameStore.getState().addStars(starsEarned)
     const panel = this.add.rectangle(this.scale.width / 2, this.scale.height / 2, 480, 270, 0xFFFFFF, 0.97)

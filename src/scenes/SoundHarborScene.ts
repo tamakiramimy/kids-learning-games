@@ -33,8 +33,6 @@ export class SoundHarborScene extends Phaser.Scene {
     const { width, height } = this.scale
     this.level = node.level
     this.activity = node.activity as PinyinActivity
-    const audioState = useGameStore.getState()
-    if (audioState.volume < 1) audioState.setVolume(1)
     syncAudioSettings()
     this.cameras.main.setBackgroundColor('#FFF1F7')
     this.cameras.main.fadeIn(220)

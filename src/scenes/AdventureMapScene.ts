@@ -331,11 +331,27 @@ export class AdventureMapScene extends Phaser.Scene {
     this.unsubscribeStore = null
   }
 
-  private toggleSound() {
+  private async toggleSound() {
     const state = useGameStore.getState()
     state.toggleMute()
     this.syncAudio()
-    if (!useGameStore.getState().isMuted) audioManager.speak('声音已打开')
+    if (useGameStore.getState().isMuted) return
+
+    await audioManager.unlock()
+    audioManager.playEffect('success')
+    if (await audioManager.isSpeechAvailable()) {
+      audioManager.speak('声音已打开')
+      return
+    }
+
+    const notice = this.add.text(this.scale.width - 22, 104, '音效已开启，中文语音不可用', {
+      fontSize: '14px',
+      color: '#7A4A17',
+      fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif',
+      backgroundColor: '#FFF8E9',
+      padding: { x: 10, y: 6 },
+    }).setOrigin(1, 0.5).setDepth(4)
+    this.time.delayedCall(2600, () => notice.destroy())
   }
 
   private openCompanionBook() {

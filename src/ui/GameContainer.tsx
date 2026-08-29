@@ -1,5 +1,6 @@
 import { useRef, useEffect } from 'react'
 import Phaser from 'phaser'
+import { audioManager } from '../audio/AudioManager'
 import { createPhaserConfig } from '../config/phaserConfig'
 import { inputManager } from '../input/InputManager'
 import { useGameStore } from '../store/gameStore'
@@ -35,12 +36,20 @@ export function GameContainer() {
     }
     const animationFrame = window.requestAnimationFrame(refreshInputBounds)
     const resizeObserver = new ResizeObserver(refreshScale)
+    const unlockAudio = () => { void audioManager.unlock() }
+    const handleVisibilityChange = () => {
+      if (document.hidden) audioManager.suspend()
+      else audioManager.resume()
+    }
     resizeObserver.observe(container)
     window.addEventListener('resize', refreshScale)
     window.addEventListener('orientationchange', refreshScale)
     window.visualViewport?.addEventListener('resize', refreshScale)
     game.canvas.addEventListener('pointerdown', refreshInputBounds, true)
     game.canvas.addEventListener('touchstart', refreshInputBounds, true)
+    game.canvas.addEventListener('pointerdown', unlockAudio, true)
+    game.canvas.addEventListener('touchstart', unlockAudio, true)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
 
     return () => {
       window.cancelAnimationFrame(animationFrame)
@@ -50,6 +59,10 @@ export function GameContainer() {
       window.visualViewport?.removeEventListener('resize', refreshScale)
       game.canvas.removeEventListener('pointerdown', refreshInputBounds, true)
       game.canvas.removeEventListener('touchstart', refreshInputBounds, true)
+      game.canvas.removeEventListener('pointerdown', unlockAudio, true)
+      game.canvas.removeEventListener('touchstart', unlockAudio, true)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      audioManager.suspend()
       inputManager.stop()
       game.destroy(true)
       const debugWindow = window as Window & {

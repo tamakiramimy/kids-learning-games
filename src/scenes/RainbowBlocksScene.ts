@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import { Engine, type TetrisGameState } from 'tetris-engine'
+import { audioManager } from '../audio/AudioManager'
 import { GameAction, inputManager } from '../input/InputManager'
 import { useGameStore } from '../store/gameStore'
 
@@ -74,7 +75,11 @@ export class RainbowBlocksScene extends Phaser.Scene {
     this.createControlButtons(width, height)
 
     this.engine = new Engine(this.columns, this.rows, (state) => {
+      const previousLines = this.engineState?.statistic.countLinesReduced ?? 0
+      const previousShapes = this.engineState?.statistic.countShapesFalled ?? 0
       this.engineState = state
+      if (state.statistic.countLinesReduced > previousLines) audioManager.playEffect('success')
+      else if (state.statistic.countShapesFalled > previousShapes) audioManager.playEffect('drop')
       this.renderBoard()
     })
     this.engine.start()
@@ -87,7 +92,7 @@ export class RainbowBlocksScene extends Phaser.Scene {
     this.dropEvent = this.time.addEvent({
       delay: 820,
       loop: true,
-      callback: () => this.moveDown(),
+      callback: () => this.moveDown(false),
     })
     this.cleanupInput = inputManager.onInput((action) => this.handleInput(action))
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.cleanup())
@@ -212,6 +217,7 @@ export class RainbowBlocksScene extends Phaser.Scene {
   private dismissTutorial() {
     this.tutorialOverlay?.destroy(true)
     this.tutorialOverlay = undefined
+    audioManager.playEffect('tap')
   }
 
   private handleInput(action: GameAction) {
@@ -230,23 +236,35 @@ export class RainbowBlocksScene extends Phaser.Scene {
     if (action === GameAction.LEFT) this.moveLeft()
     if (action === GameAction.RIGHT) this.moveRight()
     if (action === GameAction.UP || action === GameAction.CONFIRM || action === GameAction.OPTION_1) this.rotate()
-    if (action === GameAction.DOWN) this.moveDown()
+    if (action === GameAction.DOWN) this.moveDown(true)
   }
 
   private moveLeft() {
-    if (!this.gameEnded && !this.tutorialOverlay) this.engine.moveLeft()
+    if (!this.gameEnded && !this.tutorialOverlay) {
+      this.engine.moveLeft()
+      audioManager.playEffect('move')
+    }
   }
 
   private moveRight() {
-    if (!this.gameEnded && !this.tutorialOverlay) this.engine.moveRight()
+    if (!this.gameEnded && !this.tutorialOverlay) {
+      this.engine.moveRight()
+      audioManager.playEffect('move')
+    }
   }
 
   private rotate() {
-    if (!this.gameEnded && !this.tutorialOverlay) this.engine.rotate()
+    if (!this.gameEnded && !this.tutorialOverlay) {
+      this.engine.rotate()
+      audioManager.playEffect('tap')
+    }
   }
 
-  private moveDown() {
-    if (!this.gameEnded && !this.tutorialOverlay) this.engine.moveDown()
+  private moveDown(manual = true) {
+    if (!this.gameEnded && !this.tutorialOverlay) {
+      this.engine.moveDown()
+      if (manual) audioManager.playEffect('move')
+    }
   }
 
   private renderBoard() {
@@ -275,6 +293,7 @@ export class RainbowBlocksScene extends Phaser.Scene {
     this.gameEnded = true
     this.dropEvent.remove(false)
     const lines = this.engineState.statistic.countLinesReduced
+    audioManager.playEffect(lines > 0 ? 'success' : 'fail')
     if (lines > 0) useGameStore.getState().addStars(Math.min(3, lines))
     const panel = this.add.rectangle(this.scale.width / 2, this.scale.height / 2, 450, 215, 0xFFFFFF, 0.97)
       .setStrokeStyle(4, 0xB785E2, 0.9)
