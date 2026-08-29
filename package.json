@@ -1,12 +1,13 @@
 {
   "name": "kids-learning-games",
   "private": true,
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Offline learning adventures and gentle games for children aged 3 to 6.",
   "author": "tamakiramimy",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
+    "postinstall": "patch-package",
     "dev": "vite",
     "dev:electron": "concurrently \"vite\" \"wait-on http://localhost:3000 && NODE_ENV=development electron .\"",
     "build": "tsc -b && vite build",
@@ -51,6 +52,7 @@
     "electron": "^42.9.2",
     "electron-builder": "^26.15.7",
     "oxlint": "^1.69.0",
+    "patch-package": "^8.0.1",
     "tailwindcss": "^4.3.1",
     "typescript": "~6.0.2",
     "vite": "^8.2.1",
