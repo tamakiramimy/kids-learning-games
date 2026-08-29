@@ -1,5 +1,5 @@
 export class AudioManager {
-  private synth: SpeechSynthesis
+  private synth: SpeechSynthesis | undefined
   private speaking = false
   private muted = true
   private volume = 1
@@ -10,7 +10,7 @@ export class AudioManager {
 
   setMuted(muted: boolean) {
     this.muted = muted
-    if (muted) this.synth.cancel()
+    if (muted) this.synth?.cancel()
   }
 
   setVolume(volume: number) {
@@ -18,7 +18,7 @@ export class AudioManager {
   }
 
   speak(text: string, rate = 0.8, pitch = 1.1, language = 'zh-CN') {
-    if (this.muted) return
+    if (this.muted || !this.synth || typeof SpeechSynthesisUtterance === 'undefined') return
     this.synth.cancel()
     const utterance = new SpeechSynthesisUtterance(text)
     utterance.lang = language
@@ -52,7 +52,7 @@ export class AudioManager {
   }
 
   stop() {
-    this.synth.cancel()
+    this.synth?.cancel()
     this.speaking = false
   }
 }

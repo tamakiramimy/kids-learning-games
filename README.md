@@ -67,6 +67,8 @@
 - 无账号、无广告、无社交、无排行榜和无个人信息收集。
 - 所有学习进度只保存在当前设备的浏览器本地存储中。
 - 游戏默认静音；只有玩家主动打开声音后，学习卡和提示才会使用系统语音朗读。
+- Web代码、学习图片和游戏资源全部随安装包提供，Android应用不申请联网权限，也不依赖服务器、CDN或首次下载。
+- Capacitor日志中的 `https://localhost` 是应用进程内的本地资源地址，不是互联网服务器；系统没有可用的离线语音引擎时，朗读功能会静默停用，不影响游戏。
 
 ## 快速开始
 
@@ -123,7 +125,7 @@ Android 原生工程在 `android/`，iOS/iPadOS 工程在 `ios/App/`。Android �
 
 ## GitHub Actions 发布
 
-`.github/workflows/verify.yml` 会在 `main` 推送和 Pull Request 上运行依赖审计、静态检查、构建、学习内容测试、题目生成测试、无声 UI 回归与 Capacitor 同步检查。
+`.github/workflows/verify.yml` 会在 `main` 推送和 Pull Request 上运行依赖审计、静态检查、构建、学习内容测试、题目生成测试、无声 UI 回归与 Capacitor 同步检查，并在断网 Android 模拟器中确认 APK 可以进入探索地图且不申请联网权限。
 
 `.github/workflows/build-artifacts.yml` 可在 Actions 页面手动触发，也会在推送与项目版本一致的 `vX.Y.Z` 标签时触发。手动运行只保留 Actions Artifacts；标签运行会创建 GitHub Release，并发布以下文件：
 
@@ -136,9 +138,9 @@ Android 原生工程在 `android/`，iOS/iPadOS 工程在 `ios/App/`。Android �
 创建版本并发布：
 
 ```bash
-npm run verify:release -- --tag v1.0.0
-git tag -a v1.0.0 -m "Release v1.0.0"
-git push origin v1.0.0
+npm run verify:release -- --tag v1.0.1
+git tag -a v1.0.1 -m "Release v1.0.1"
+git push origin v1.0.1
 ```
 
 当前常规 Release 是跨平台构建验证版本：Windows 与 macOS 包没有商业代码签名；Android Debug APK 使用测试签名，可直接侧载测试，AAB 未签名且不能上传 Google Play；iOS/iPadOS IPA 未签名，只用于检查构建结果，不能直接安装到普通设备。

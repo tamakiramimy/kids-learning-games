@@ -42,3 +42,65 @@ jobs:
           npx wait-on http://127.0.0.1:3000
           UI_BASE_URL=http://127.0.0.1:3000/ python3 scripts/verify-ui.py
       - run: npm run mobile:sync
+
+  android-offline-startup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - run: npm ci
+      - run: npm run build
+      - run: npx cap sync android
+      - name: Build debug APK
+        working-directory: android
+        run: |
+          ./gradlew assembleDebug
+          if grep -Rqs 'android.permission.INTERNET' app/build/intermediates/merged_manifests/debug; then
+            echo 'Android APK must not request INTERNET permission.'
+            exit 1
+          fi
+      - name: Verify offline startup
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          script: |
+            adb install android/app/build/outputs/apk/debug/app-debug.apk
+            adb shell svc wifi disable
+            adb shell svc data disable
+            adb logcat -c
+            adb shell am start -W -n com.xingya.kidslearning/.MainActivity
+            ready=false
+            for attempt in $(seq 1 30); do
+              if adb logcat -d -v brief | grep -Fq '[xingya] startup-ready AdventureMapScene'; then
+                ready=true
+                break
+              fi
+              sleep 1
+            done
+            adb logcat -d -v threadtime > android-startup.log
+            if grep -Eq 'JavaScript Error|Uncaught TypeError|FATAL EXCEPTION' android-startup.log; then
+              echo 'Android startup emitted a fatal error.'
+              exit 1
+            fi
+            if [ "$ready" != true ]; then
+              echo 'Android did not reach AdventureMapScene while offline.'
+              exit 1
+            fi
+      - name: Upload Android startup log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-offline-startup-log
+          path: android-startup.log
+          if-no-files-found: warn

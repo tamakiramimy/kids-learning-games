@@ -44,6 +44,7 @@ export class BootScene extends Phaser.Scene {
   }
 
   create() {
+    console.info('[xingya] startup-ready AdventureMapScene')
     this.scene.start('AdventureMapScene')
   }
 
