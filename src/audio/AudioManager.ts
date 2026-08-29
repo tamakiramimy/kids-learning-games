@@ -1,8 +1,8 @@
 export class AudioManager {
   private synth: SpeechSynthesis
   private speaking = false
-  private muted = true
-  private volume = 0.8
+  private muted = false
+  private volume = 1
 
   constructor() {
     this.synth = window.speechSynthesis

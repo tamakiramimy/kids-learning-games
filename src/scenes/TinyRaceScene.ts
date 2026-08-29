@@ -31,11 +31,11 @@ export class TinyRaceScene extends Phaser.Scene {
   private levelText!: Phaser.GameObjects.Text
   private feedbackText!: Phaser.GameObjects.Text
   private pauseOverlay?: Phaser.GameObjects.Container
+  private tutorialOverlay?: Phaser.GameObjects.Container
   private laneIndex = 1
   private coins = 0
   private score = 0
   private distance = 0
-  private hearts = 3
   private level = 1
   private passedTraffic = 0
   private shieldTime = 0
@@ -50,6 +50,27 @@ export class TinyRaceScene extends Phaser.Scene {
   }
 
   create() {
+    this.cleanupInput?.()
+    this.cleanupInput = null
+    this.obstacleEvent?.remove(false)
+    this.coinEvent?.remove(false)
+    this.itemEvent?.remove(false)
+    this.entities = []
+    this.pauseOverlay = undefined
+    this.tutorialOverlay = undefined
+    this.laneIndex = 1
+    this.coins = 0
+    this.score = 0
+    this.distance = 0
+    this.level = 1
+    this.passedTraffic = 0
+    this.shieldTime = 0
+    this.magnetTime = 0
+    this.boostCharges = 0
+    this.boostTime = 0
+    this.paused = false
+    this.gameEnded = false
+
     const { width, height } = this.scale
     const host = this.game.canvas.parentElement
     if (!host) throw new Error('Racing scene requires a game container')
@@ -71,11 +92,12 @@ export class TinyRaceScene extends Phaser.Scene {
     this.spawnItem('shield', -118, -1)
     this.cleanupInput = inputManager.onInput((action) => this.handleInput(action))
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.cleanup())
+    this.createTutorial(width, height)
     this.refreshHud()
   }
 
   update(_time: number, delta: number) {
-    if (this.paused || this.gameEnded) return
+    if (this.tutorialOverlay || this.paused || this.gameEnded) return
     const seconds = delta / 1000
     const pace = this.boostTime > 0 ? 1.64 : 1
     this.distance += seconds * 18 * pace
@@ -89,56 +111,32 @@ export class TinyRaceScene extends Phaser.Scene {
   }
 
   private createHud(width: number) {
-    this.add.rectangle(18, 18, 208, 236, 0x0e1a20, 0.93)
-      .setOrigin(0)
-      .setStrokeStyle(2, 0x31515d, 0.9)
-    this.add.text(112, 42, '游戏状态', {
-      fontSize: '22px',
-      color: '#FFE05A',
-      fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif',
-      fontStyle: 'bold',
-    }).setOrigin(0, 0.5)
-    this.add.rectangle(40, 66, 160, 1, 0x4a6d73, 0.75).setOrigin(0, 0.5)
-
-    const labelStyle: Phaser.Types.GameObjects.Text.TextStyle = {
-      fontSize: '15px',
-      color: '#B3C5C9',
-      fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif',
-    }
-    this.add.text(40, 92, '速度', labelStyle)
-    this.add.text(40, 124, '得分', labelStyle)
-    this.add.text(40, 156, '距离', labelStyle)
-    this.add.text(40, 188, '护航', labelStyle)
-    this.speedText = this.add.text(192, 92, '', { ...labelStyle, color: '#FF715F', fontSize: '20px', fontStyle: 'bold' }).setOrigin(1, 0)
-    this.scoreText = this.add.text(192, 124, '', { ...labelStyle, color: '#61E1A2', fontSize: '20px', fontStyle: 'bold' }).setOrigin(1, 0)
-    this.distanceText = this.add.text(192, 156, '', { ...labelStyle, color: '#E7F5F2', fontSize: '16px', fontStyle: 'bold' }).setOrigin(1, 0)
-    this.heartsText = this.add.text(192, 188, '', { ...labelStyle, color: '#F4C0B8', fontSize: '16px', fontStyle: 'bold' }).setOrigin(1, 0)
-    this.itemText = this.add.text(40, 222, '', { ...labelStyle, color: '#7CE4D7', fontSize: '14px', fontStyle: 'bold' })
-
-    const levelPanel = this.add.rectangle(width - 58, 18, 84, 82, 0x0e1a20, 0.93)
+    const center = width / 2
+    this.add.rectangle(center, 14, 570, 66, 0x0e1a20, 0.88)
       .setOrigin(0.5, 0)
-      .setStrokeStyle(2, 0x31515d, 0.9)
-    this.add.text(levelPanel.x, 40, 'LEVEL', {
-      fontSize: '11px',
-      color: '#B3C5C9',
-      fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif',
-      fontStyle: 'bold',
+      .setStrokeStyle(2, 0x31515d, 0.84)
+    const labelStyle: Phaser.Types.GameObjects.Text.TextStyle = {
+      fontSize: '12px', color: '#B3C5C9', fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif', fontStyle: 'bold',
+    }
+    const valueStyle: Phaser.Types.GameObjects.Text.TextStyle = {
+      fontSize: '20px', color: '#E7F5F2', fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif', fontStyle: 'bold',
+    }
+    const metric = (x: number, label: string, color: string) => {
+      this.add.text(x, 27, label, labelStyle).setOrigin(0.5)
+      return this.add.text(x, 51, '', { ...valueStyle, color }).setOrigin(0.5)
+    }
+    this.speedText = metric(center - 190, '速度', '#FF715F')
+    this.scoreText = metric(center - 95, '得分', '#61E1A2')
+    this.distanceText = metric(center, '距离', '#E7F5F2')
+    this.heartsText = metric(center + 95, '护航', '#F4C0B8')
+    this.levelText = metric(center + 190, '关卡', '#D08AFF')
+    this.itemText = this.add.text(center, 98, '', {
+      fontSize: '15px', color: '#7CE4D7', fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif', fontStyle: 'bold',
     }).setOrigin(0.5)
-    this.levelText = this.add.text(levelPanel.x, 68, '', {
-      fontSize: '28px',
-      color: '#D08AFF',
-      fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif',
-      fontStyle: 'bold',
+    this.turnText = this.add.text(center, 122, '', {
+      fontSize: '15px', color: '#F3FFE2', fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif', fontStyle: 'bold',
     }).setOrigin(0.5)
-    this.turnText = this.add.text(width - 26, 122, '', {
-      fontSize: '15px',
-      color: '#F3FFE2',
-      fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif',
-      fontStyle: 'bold',
-      backgroundColor: '#173D38',
-      padding: { x: 12, y: 7 },
-    }).setOrigin(1, 0.5)
-    this.feedbackText = this.add.text(width / 2, 136, '', {
+    this.feedbackText = this.add.text(center, 152, '', {
       fontSize: '22px',
       color: '#FFF0A5',
       fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif',
@@ -147,7 +145,7 @@ export class TinyRaceScene extends Phaser.Scene {
       strokeThickness: 5,
     }).setOrigin(0.5).setAlpha(0)
 
-    const pauseButton = this.add.text(width - 152, 42, 'II', {
+    const pauseButton = this.add.text(width - 42, 42, 'II', {
       fontSize: '18px',
       color: '#E9FBFF',
       fontFamily: 'Arial, sans-serif',
@@ -159,7 +157,7 @@ export class TinyRaceScene extends Phaser.Scene {
   }
 
   private createBackButton() {
-    const button = this.add.text(72, 42, '<', {
+    const button = this.add.text(42, 42, '<', {
       fontSize: '24px',
       color: '#F3FAFC',
       fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif',
@@ -174,7 +172,7 @@ export class TinyRaceScene extends Phaser.Scene {
     const roadInput = this.add.zone(width / 2, (height + 118) / 2, width, height - 180)
       .setInteractive({ useHandCursor: true })
     roadInput.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      if (this.paused || this.gameEnded) return
+      if (this.tutorialOverlay || this.paused || this.gameEnded) return
       this.laneIndex = pointer.x < width * 0.34 ? 0 : pointer.x > width * 0.66 ? 2 : 1
     })
   }
@@ -198,22 +196,44 @@ export class TinyRaceScene extends Phaser.Scene {
     createControl(width / 2, '加速', 0xdf7d35, () => this.useBoost())
   }
 
+  private createTutorial(width: number, height: number) {
+    const shade = this.add.rectangle(width / 2, height / 2, width, height, 0x102228, 0.76)
+    const panel = this.add.rectangle(width / 2, height / 2, 590, 330, 0xF3FFFF, 0.98)
+      .setStrokeStyle(4, 0x5BC6C1, 0.95)
+    const title = this.add.text(width / 2, height / 2 - 118, '星芽拉力赛怎么玩？', {
+      fontSize: '34px', color: '#164753', fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif', fontStyle: 'bold',
+    }).setOrigin(0.5)
+    const instructions = this.add.text(width / 2, height / 2 - 30, '鼠标/触摸：点击左、右按钮换车道，点击「加速」使用氮气\n键盘：← → 或 A / D 换车道，Enter / 空格加速\n手柄：摇杆或十字键换车道，A / X 加速', {
+      fontSize: '16px', color: '#315D67', fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif', align: 'center', lineSpacing: 11,
+    }).setOrigin(0.5)
+    const start = this.add.text(width / 2, height / 2 + 102, '开始冲刺', {
+      fontSize: '22px', color: '#0D2730', fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif', fontStyle: 'bold', backgroundColor: '#8FE4D8', padding: { x: 34, y: 12 },
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true })
+    start.on('pointerdown', () => this.dismissTutorial())
+    this.tutorialOverlay = this.add.container(0, 0, [shade, panel, title, instructions, start]).setDepth(30)
+  }
+
+  private dismissTutorial() {
+    this.tutorialOverlay?.destroy(true)
+    this.tutorialOverlay = undefined
+  }
+
   private spawnBarrier(startZ = -176, laneOverride?: number) {
-    if (this.paused || this.gameEnded || this.entities.filter((entity) => entity.kind === 'barrier').length >= 4) return
+    if (this.tutorialOverlay || this.paused || this.gameEnded || this.entities.filter((entity) => entity.kind === 'barrier').length >= 4) return
     const lane = laneOverride ?? Phaser.Math.Between(-1, 1)
     const visual = this.raceRenderer.createVisual('barrier', lane, startZ)
     this.entities.push({ kind: 'barrier', lane, visual, speed: Phaser.Math.Between(28, 35) + this.level * 1.2, z: startZ })
   }
 
   private spawnCoin(startZ = -156, laneOverride?: number) {
-    if (this.paused || this.gameEnded || this.entities.filter((entity) => entity.kind === 'coin').length >= 8) return
+    if (this.tutorialOverlay || this.paused || this.gameEnded || this.entities.filter((entity) => entity.kind === 'coin').length >= 8) return
     const lane = laneOverride ?? Phaser.Math.Between(-1, 1)
     const visual = this.raceRenderer.createVisual('coin', lane, startZ)
     this.entities.push({ kind: 'coin', lane, visual, speed: Phaser.Math.Between(25, 30), z: startZ })
   }
 
   private spawnItem(kindOverride?: Exclude<RoadEntityKind, 'coin' | 'barrier'>, startZ = -184, laneOverride?: number) {
-    if (this.paused || this.gameEnded || this.entities.some((entity) => entity.kind === 'shield' || entity.kind === 'turbo' || entity.kind === 'magnet')) return
+    if (this.tutorialOverlay || this.paused || this.gameEnded || this.entities.some((entity) => entity.kind === 'shield' || entity.kind === 'turbo' || entity.kind === 'magnet')) return
     const kind = kindOverride ?? Phaser.Utils.Array.GetRandom(['shield', 'turbo', 'magnet'] as const)
     const lane = laneOverride ?? Phaser.Math.Between(-1, 1)
     const visual = this.raceRenderer.createVisual(kind, lane, startZ)
@@ -255,6 +275,7 @@ export class TinyRaceScene extends Phaser.Scene {
   }
 
   private resolveEntity(entity: RoadEntity) {
+    if (this.gameEnded) return
     if (entity.kind === 'coin') {
       const gained = this.boostTime > 0 ? 2 : 1
       this.coins += gained
@@ -268,11 +289,8 @@ export class TinyRaceScene extends Phaser.Scene {
         this.showFeedback('护盾撞开了障碍', '#82F1DD')
         return
       }
-      this.hearts -= 1
-      this.score = Math.max(0, this.score - 100)
       this.cameras.main.shake(220, 0.009)
-      this.showFeedback('撞到障碍，少一颗爱心', '#FFB3A7')
-      if (this.hearts <= 0) this.finishGame(false)
+      this.showFeedback('撞到障碍，没关系，继续前进！', '#FFB3A7')
       return
     }
     if (entity.kind === 'shield') {
@@ -290,18 +308,22 @@ export class TinyRaceScene extends Phaser.Scene {
   }
 
   private changeLane(direction: number) {
-    if (this.paused || this.gameEnded) return
+    if (this.tutorialOverlay || this.paused || this.gameEnded) return
     this.laneIndex = Phaser.Math.Clamp(this.laneIndex + direction, 0, 2)
   }
 
   private useBoost() {
-    if (this.paused || this.gameEnded || this.boostCharges <= 0 || this.boostTime > 0) return
+    if (this.tutorialOverlay || this.paused || this.gameEnded || this.boostCharges <= 0 || this.boostTime > 0) return
     this.boostCharges -= 1
     this.boostTime = 4
     this.showFeedback('氮气加速！金币双倍', '#FFD39B')
   }
 
   private handleInput(action: GameAction) {
+    if (this.tutorialOverlay) {
+      if (action === GameAction.CONFIRM || action === GameAction.OPTION_1) this.dismissTutorial()
+      return
+    }
     if (action === GameAction.BACK) {
       if (this.gameEnded) this.returnToHub()
       else this.togglePause()
@@ -359,7 +381,7 @@ export class TinyRaceScene extends Phaser.Scene {
     this.speedText.setText(`${speed}`)
     this.scoreText.setText(`${this.score}`)
     this.distanceText.setText(`${Math.min(this.finishDistance, Math.floor(this.distance))}m`)
-    this.heartsText.setText(`${'●'.repeat(this.hearts)}${'○'.repeat(3 - this.hearts)}`)
+    this.heartsText.setText('∞')
     this.itemText.setText(`氮气 ${this.boostCharges}  ${effects.join(' · ')}`)
     this.levelText.setText(`${this.level}`)
     this.turnText.setText(this.boostTime > 0 ? '氮气冲刺中' : '三车道躲避')
@@ -410,5 +432,6 @@ export class TinyRaceScene extends Phaser.Scene {
     this.entities = []
     this.raceRenderer?.dispose()
     this.pauseOverlay?.destroy(true)
+    this.tutorialOverlay?.destroy(true)
   }
 }

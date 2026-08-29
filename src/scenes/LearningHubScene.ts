@@ -106,7 +106,7 @@ export class LearningHubScene extends Phaser.Scene {
       wordWrap: { width: 240 },
       align: 'center',
     }).setOrigin(0.5)
-    this.add.text(x, y + 76, `每轮 ${module.sessionQuestions} 题`, {
+    this.add.text(x, y + 76, `每轮随机 ${module.sessionQuestions} 题 · 题库 ${module.questions.length}+`, {
       fontSize: '15px',
       color: module.accentHex,
       fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif',

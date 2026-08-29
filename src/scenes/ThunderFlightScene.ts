@@ -42,7 +42,6 @@ export class ThunderFlightScene extends Phaser.Scene {
   private wave = 1
   private defeatedInWave = 0
   private goalForWave = 6
-  private hearts = 4
   private power = 1
   private storms = 2
   private combo = 0
@@ -61,6 +60,34 @@ export class ThunderFlightScene extends Phaser.Scene {
   }
 
   create() {
+    this.cleanupInput?.()
+    this.cleanupInput = null
+    this.enemyEvent?.remove(false)
+    this.itemEvent?.remove(false)
+    this.fireEvent?.remove(false)
+    this.enemyBullets = []
+    this.enemies = []
+    this.items = []
+    this.stars = []
+    this.startOverlay = undefined
+    this.pauseOverlay = undefined
+    this.score = 0
+    this.wave = 1
+    this.defeatedInWave = 0
+    this.goalForWave = 6
+    this.power = 1
+    this.storms = 2
+    this.combo = 0
+    this.comboTimer = 0
+    this.shieldTime = 0
+    this.turboTime = 0
+    this.magnetTime = 0
+    this.elapsed = 0
+    this.difficulty = 'normal'
+    this.gameStarted = false
+    this.paused = false
+    this.gameEnded = false
+
     const { width, height } = this.scale
     this.cameras.main.setBackgroundColor('#0E1740')
     this.createSky(width, height)
@@ -220,7 +247,7 @@ export class ThunderFlightScene extends Phaser.Scene {
     createButton(126, '<', '#456DB7', () => this.movePlayer(-1))
     createButton(width - 126, '>', '#456DB7', () => this.movePlayer(1))
     createButton(width / 2, '雷暴', '#D77B3A', () => this.useStorm())
-    this.add.text(26, 145, '拖动飞船或用方向键/手柄移动\n空格/J 释放雷暴', {
+    this.add.text(26, 145, '鼠标/触摸：拖动飞船\n键盘：方向键移动，空格/J 雷暴\n手柄：摇杆/十字键移动，A/X 雷暴', {
       fontSize: '14px',
       color: '#C5D8FF',
       fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif',
@@ -362,6 +389,7 @@ export class ThunderFlightScene extends Phaser.Scene {
   }
 
   private destroyEnemy(enemy: FlightEnemy) {
+    if (this.gameEnded) return
     const index = this.enemies.indexOf(enemy)
     if (index >= 0) this.enemies.splice(index, 1)
     this.combo += 1
@@ -410,21 +438,24 @@ export class ThunderFlightScene extends Phaser.Scene {
     this.cameras.main.flash(140, 255, 236, 152)
     this.tweens.add({ targets: beam, alpha: 0, duration: 220, onComplete: () => beam.destroy() })
     const targets = [...this.enemies]
-    targets.forEach((enemy) => this.destroyEnemy(enemy))
+    for (const enemy of targets) {
+      if (this.gameEnded) break
+      this.destroyEnemy(enemy)
+    }
     this.showFeedback('雷暴清空天空！', '#FFE58A')
   }
 
   private damagePlayer() {
+    if (this.gameEnded) return
     if (this.shieldTime > 0) {
       this.showFeedback('护盾挡住了撞击', '#A9F5DB')
       return
     }
-    this.hearts -= 1
     this.combo = 0
     this.player.setAlpha(0.35)
     this.cameras.main.shake(180, 0.008)
     this.tweens.add({ targets: this.player, alpha: 1, duration: 300 })
-    if (this.hearts <= 0) this.finishGame(false)
+    this.showFeedback('没关系，继续飞行！', '#A9F5DB')
   }
 
   private movePlayer(direction: number) {
@@ -493,10 +524,12 @@ export class ThunderFlightScene extends Phaser.Scene {
       color: '#9EC4FF',
       fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif',
     }).setOrigin(0.5)
-    const hint = this.add.text(width / 2, 566, '鼠标或手指拖动飞船 · 方向键/手柄移动 · 空格/J 雷暴', {
-      fontSize: '17px',
+    const hint = this.add.text(width / 2, 566, '怎么玩\n鼠标/触摸：拖动飞船，点「雷暴」\n键盘：方向键移动，空格/J 雷暴　·　手柄：摇杆/十字键移动，A/X 雷暴', {
+      fontSize: '14px',
       color: '#B9D2FF',
       fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif',
+      align: 'center',
+      lineSpacing: 5,
     }).setOrigin(0.5)
     this.startOverlay = this.add.container(0, 0, [shade, title, subtitle, hint]).setDepth(30)
     const choices: Array<{ difficulty: FlightDifficulty; label: string; detail: string; color: number }> = [
@@ -530,7 +563,6 @@ export class ThunderFlightScene extends Phaser.Scene {
   private startGame(difficulty: FlightDifficulty) {
     this.difficulty = difficulty
     this.gameStarted = true
-    this.hearts = difficulty === 'easy' ? 5 : difficulty === 'hard' ? 3 : 4
     this.storms = difficulty === 'easy' ? 3 : 2
     this.goalForWave = difficulty === 'hard' ? 8 : 6
     this.startOverlay?.destroy(true)
@@ -582,7 +614,7 @@ export class ThunderFlightScene extends Phaser.Scene {
     this.scoreText.setText(`得分 ${this.score}`)
     const difficultyLabel = this.difficulty === 'easy' ? '轻松' : this.difficulty === 'hard' ? '挑战' : '巡航'
     this.waveText.setText(`${difficultyLabel} · 第 ${this.wave} 波 ${this.defeatedInWave}/${this.goalForWave}`)
-    this.heartsText.setText(`护航 ${'●'.repeat(this.hearts)}${'○'.repeat(4 - this.hearts)}`)
+    this.heartsText.setText('护航 ∞')
     this.powerText.setText(`火力 Lv${this.power} · 雷暴 ${this.storms}`)
     this.effectText.setText(effects.join(' · '))
     this.comboText.setText(this.combo >= 3 ? `${this.combo} 连击` : '')

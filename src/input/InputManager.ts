@@ -15,6 +15,11 @@ export const GameAction = {
 export type GameAction = typeof GameAction[keyof typeof GameAction]
 
 type InputCallback = (action: GameAction) => void
+type DirectionState = Record<'up' | 'down' | 'left' | 'right', boolean>
+
+const AXIS_PRESS_THRESHOLD = 0.5
+const DIRECTION_REPEAT_DELAY = 320
+const DIRECTION_REPEAT_INTERVAL = 110
 
 export class InputManager {
   private callbacks: Set<InputCallback> = new Set()
@@ -23,7 +28,8 @@ export class InputManager {
   private gamepadIndex: number | null = null
   private pollInterval: number | null = null
   private prevButtons = new Set<number>()
-  private prevDpad = { up: false, down: false, left: false, right: false }
+  private prevDpad: DirectionState = { up: false, down: false, left: false, right: false }
+  private directionRepeatAt: Partial<Record<keyof DirectionState, number>> = {}
 
   private readonly KEY_MAP: Record<string, GameAction> = {
     ArrowUp: GameAction.UP,
@@ -55,27 +61,30 @@ export class InputManager {
   }
 
   start() {
+    if (this.pollInterval !== null) return
     window.addEventListener('keydown', this.onKeyDown)
     window.addEventListener('keyup', this.onKeyUp)
+    window.addEventListener('blur', this.clearHeldInput)
     window.addEventListener('gamepadconnected', this.onGamepadConnected)
     window.addEventListener('gamepaddisconnected', this.onGamepadDisconnected)
     window.addEventListener('touchstart', this.onTouchStart, { passive: false })
-    this.detectConnectedGamepad()
+    this.selectActiveGamepad()
     this.pollInterval = window.setInterval(() => this.pollGamepad(), 16)
   }
 
   stop() {
     window.removeEventListener('keydown', this.onKeyDown)
     window.removeEventListener('keyup', this.onKeyUp)
+    window.removeEventListener('blur', this.clearHeldInput)
     window.removeEventListener('gamepadconnected', this.onGamepadConnected)
     window.removeEventListener('gamepaddisconnected', this.onGamepadDisconnected)
     window.removeEventListener('touchstart', this.onTouchStart)
-    if (this.pollInterval) clearInterval(this.pollInterval)
+    if (this.pollInterval !== null) clearInterval(this.pollInterval)
     this.pollInterval = null
+    this.keysDown.clear()
     this.gamepadConnected = false
     this.gamepadIndex = null
-    this.prevButtons.clear()
-    this.prevDpad = { up: false, down: false, left: false, right: false }
+    this.resetGamepadEdges()
   }
 
   onInput(cb: InputCallback) {
@@ -89,17 +98,17 @@ export class InputManager {
 
   getDirection() {
     const gamepad = this.getActiveGamepad()
-    const gamepadX = gamepad
-      ? PhaserLikeClamp((gamepad.axes[0] ?? 0) || (gamepad.buttons[15]?.pressed ? 1 : gamepad.buttons[14]?.pressed ? -1 : 0))
-      : 0
-    const gamepadY = gamepad
-      ? PhaserLikeClamp((gamepad.axes[1] ?? 0) || (gamepad.buttons[13]?.pressed ? 1 : gamepad.buttons[12]?.pressed ? -1 : 0))
-      : 0
-    const keyboardX = (this.keysDown.has('ArrowRight') ? 1 : 0) - (this.keysDown.has('ArrowLeft') ? 1 : 0)
-    const keyboardY = (this.keysDown.has('ArrowDown') ? 1 : 0) - (this.keysDown.has('ArrowUp') ? 1 : 0)
+    const gamepadX = gamepad ? this.axisDirection(gamepad.axes[0] ?? 0) : 0
+    const gamepadY = gamepad ? this.axisDirection(gamepad.axes[1] ?? 0) : 0
+    const dpadX = gamepad ? (gamepad.buttons[15]?.pressed ? 1 : gamepad.buttons[14]?.pressed ? -1 : 0) : 0
+    const dpadY = gamepad ? (gamepad.buttons[13]?.pressed ? 1 : gamepad.buttons[12]?.pressed ? -1 : 0) : 0
+    const keyboardX = Number(this.keysDown.has('ArrowRight') || this.keysDown.has('KeyD'))
+      - Number(this.keysDown.has('ArrowLeft') || this.keysDown.has('KeyA'))
+    const keyboardY = Number(this.keysDown.has('ArrowDown') || this.keysDown.has('KeyS'))
+      - Number(this.keysDown.has('ArrowUp') || this.keysDown.has('KeyW'))
     return {
-      x: keyboardX || gamepadX,
-      y: keyboardY || gamepadY,
+      x: keyboardX || dpadX || gamepadX,
+      y: keyboardY || dpadY || gamepadY,
     }
   }
 
@@ -121,68 +130,108 @@ export class InputManager {
     this.keysDown.delete(e.code)
   }
 
+  private clearHeldInput = () => {
+    this.keysDown.clear()
+    this.resetGamepadEdges()
+  }
+
   private onGamepadConnected = (e: GamepadEvent) => {
+    if (this.getActiveGamepad()) return
     this.gamepadConnected = true
     this.gamepadIndex = e.gamepad.index
+    this.resetGamepadEdges()
   }
 
-  private onGamepadDisconnected = () => {
-    this.gamepadConnected = false
+  private onGamepadDisconnected = (e: GamepadEvent) => {
+    if (e.gamepad.index !== this.gamepadIndex) return
     this.gamepadIndex = null
+    this.gamepadConnected = false
+    this.resetGamepadEdges()
+    this.selectActiveGamepad()
   }
 
-  private detectConnectedGamepad() {
-    const gamepad = navigator.getGamepads?.().find((item) => item !== null)
-    if (!gamepad) return
-    this.gamepadConnected = true
-    this.gamepadIndex = gamepad.index
+  private selectActiveGamepad() {
+    const gamepads = Array.from(navigator.getGamepads?.() ?? [])
+    const gamepad = gamepads.find((item): item is Gamepad => item !== null && item.connected)
+    this.gamepadConnected = Boolean(gamepad)
+    this.gamepadIndex = gamepad?.index ?? null
+    if (!gamepad) this.resetGamepadEdges()
+    return gamepad ?? null
   }
 
   private pollGamepad() {
     const gamepad = this.getActiveGamepad()
     if (!gamepad) return
 
-    // D-pad
-    const dpad = {
-      up: gamepad.buttons[12]?.pressed || gamepad.axes[1] < -0.5,
-      down: gamepad.buttons[13]?.pressed || gamepad.axes[1] > 0.5,
-      left: gamepad.buttons[14]?.pressed || gamepad.axes[0] < -0.5,
-      right: gamepad.buttons[15]?.pressed || gamepad.axes[0] > 0.5,
+    const axisX = this.axisDirection(gamepad.axes[0] ?? 0)
+    const axisY = this.axisDirection(gamepad.axes[1] ?? 0)
+    const dpad: DirectionState = {
+      up: Boolean(gamepad.buttons[12]?.pressed) || axisY < 0,
+      down: Boolean(gamepad.buttons[13]?.pressed) || axisY > 0,
+      left: Boolean(gamepad.buttons[14]?.pressed) || axisX < 0,
+      right: Boolean(gamepad.buttons[15]?.pressed) || axisX > 0,
     }
 
-    if (dpad.up && !this.prevDpad.up) this.emit(GameAction.UP)
-    if (dpad.down && !this.prevDpad.down) this.emit(GameAction.DOWN)
-    if (dpad.left && !this.prevDpad.left) this.emit(GameAction.LEFT)
-    if (dpad.right && !this.prevDpad.right) this.emit(GameAction.RIGHT)
+    this.emitDirections(dpad)
     this.prevDpad = dpad
 
-    // Buttons
     for (const [btnIdx, action] of Object.entries(this.GAMEPAD_BUTTON_MAP)) {
       const idx = Number(btnIdx)
-      if (gamepad.buttons[idx]?.pressed && !this.prevButtons.has(idx)) {
-        this.emit(action)
-      }
+      if (gamepad.buttons[idx]?.pressed && !this.prevButtons.has(idx)) this.emit(action)
     }
 
     this.prevButtons.clear()
-    for (let i = 0; i < gamepad.buttons.length; i++) {
-      if (gamepad.buttons[i]?.pressed) this.prevButtons.add(i)
+    for (let index = 0; index < gamepad.buttons.length; index += 1) {
+      if (gamepad.buttons[index]?.pressed) this.prevButtons.add(index)
+    }
+  }
+
+  private emitDirections(dpad: DirectionState) {
+    const now = performance.now()
+    const actionForDirection: Record<keyof DirectionState, GameAction> = {
+      up: GameAction.UP,
+      down: GameAction.DOWN,
+      left: GameAction.LEFT,
+      right: GameAction.RIGHT,
+    }
+
+    for (const direction of Object.keys(dpad) as Array<keyof DirectionState>) {
+      if (!dpad[direction]) {
+        delete this.directionRepeatAt[direction]
+        continue
+      }
+      if (!this.prevDpad[direction]) {
+        this.emit(actionForDirection[direction])
+        this.directionRepeatAt[direction] = now + DIRECTION_REPEAT_DELAY
+      } else if (now >= (this.directionRepeatAt[direction] ?? Infinity)) {
+        this.emit(actionForDirection[direction])
+        this.directionRepeatAt[direction] = now + DIRECTION_REPEAT_INTERVAL
+      }
     }
   }
 
   private getActiveGamepad() {
-    if (this.gamepadIndex === null) return null
-    return navigator.getGamepads?.()[this.gamepadIndex] ?? null
+    if (this.gamepadIndex !== null) {
+      const gamepad = navigator.getGamepads?.()[this.gamepadIndex] ?? null
+      if (gamepad?.connected) return gamepad
+    }
+    return this.selectActiveGamepad()
+  }
+
+  private axisDirection(value: number) {
+    if (Math.abs(value) < AXIS_PRESS_THRESHOLD) return 0
+    return value < 0 ? -1 : 1
+  }
+
+  private resetGamepadEdges() {
+    this.prevButtons.clear()
+    this.prevDpad = { up: false, down: false, left: false, right: false }
+    this.directionRepeatAt = {}
   }
 
   private onTouchStart = () => {
-    // Touch is handled by Phaser's built-in input system
-    // We just ensure the AudioContext is unlocked on first touch
+    // Touch is handled by Phaser's built-in input system.
   }
-}
-
-function PhaserLikeClamp(value: number) {
-  return Math.max(-1, Math.min(1, value))
 }
 
 export const inputManager = new InputManager()

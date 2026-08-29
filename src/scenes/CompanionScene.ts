@@ -23,6 +23,8 @@ export class CompanionScene extends Phaser.Scene {
 
   create() {
     const { width, height } = this.scale
+    this.cards = []
+    this.selectedIndex = 0
     this.cameras.main.setBackgroundColor('#F6FBFF')
     this.createBackground(width, height)
 
@@ -198,7 +200,9 @@ export class CompanionScene extends Phaser.Scene {
   private updateSelection(index: number) {
     this.selectedIndex = index
     this.cards.forEach((card, cardIndex) => {
-      const world = getWorld(WORLD_ORDER[cardIndex])
+      const module = WORLD_ORDER[cardIndex]
+      if (!module) return
+      const world = getWorld(module)
       const selected = cardIndex === index
       card.panel.setScale(selected ? 1.025 : 1)
       card.outline.setAlpha(selected ? 1 : 0)
@@ -210,6 +214,7 @@ export class CompanionScene extends Phaser.Scene {
   private updateDetail() {
     if (!this.detailText || !this.cards.length) return
     const module = WORLD_ORDER[this.selectedIndex]
+    if (!module) return
     const world = getWorld(module)
     const fragments = useGameStore.getState().companionFragments[module]
     const remaining = Math.max(0, world.companionUnlockFragments - fragments)

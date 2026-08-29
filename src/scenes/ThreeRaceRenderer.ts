@@ -14,10 +14,10 @@ interface RoadsideObject {
 
 export class ThreeRaceRenderer {
   readonly laneSpacing = 3.8
-  readonly playerZ = 0.8
+  readonly playerZ = -6.2
 
   private readonly scene = new THREE.Scene()
-  private readonly camera = new THREE.PerspectiveCamera(52, 16 / 9, 0.1, 420)
+  private readonly camera = new THREE.PerspectiveCamera(58, 16 / 9, 0.1, 420)
   private readonly renderer = new THREE.WebGLRenderer({ antialias: true })
   private readonly roadMarkers: THREE.Mesh[] = []
   private readonly roadsideObjects: RoadsideObject[] = []
@@ -41,7 +41,7 @@ export class ThreeRaceRenderer {
 
     this.scene.background = new THREE.Color(0x82cce7)
     this.scene.fog = new THREE.Fog(0x82cce7, 62, 260)
-    this.camera.position.set(0, 8.5, 20.5)
+    this.camera.position.set(0, 9.6, 21.5)
 
     this.createWorld()
     const playerParts = this.createPlayerCar()
@@ -83,7 +83,7 @@ export class ThreeRaceRenderer {
     }
 
     this.camera.position.x = THREE.MathUtils.damp(this.camera.position.x, this.player.position.x * 0.14, 5, deltaSeconds)
-    this.camera.lookAt(this.player.position.x * 0.14, 0.9, -38)
+    this.camera.lookAt(this.player.position.x * 0.14, 0.7, -42)
     this.render()
   }
 

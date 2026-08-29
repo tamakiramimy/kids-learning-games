@@ -36,6 +36,7 @@ export class RainbowBlocksScene extends Phaser.Scene {
   private dropEvent!: Phaser.Time.TimerEvent
   private linesText!: Phaser.GameObjects.Text
   private nextText!: Phaser.GameObjects.Text
+  private tutorialOverlay?: Phaser.GameObjects.Container
   private gameEnded = false
 
   constructor() {
@@ -43,6 +44,13 @@ export class RainbowBlocksScene extends Phaser.Scene {
   }
 
   create() {
+    this.cleanupInput?.()
+    this.cleanupInput = null
+    this.dropEvent?.remove(false)
+    this.cells = []
+    this.tutorialOverlay = undefined
+    this.gameEnded = false
+
     const { width, height } = this.scale
     this.cameras.main.setBackgroundColor('#FAF7FF')
     this.createBackground(width, height)
@@ -83,6 +91,7 @@ export class RainbowBlocksScene extends Phaser.Scene {
     })
     this.cleanupInput = inputManager.onInput((action) => this.handleInput(action))
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.cleanup())
+    this.createTutorial(width, height)
   }
 
   private createBackground(width: number, height: number) {
@@ -183,7 +192,33 @@ export class RainbowBlocksScene extends Phaser.Scene {
     createButton(width / 2 + 210, '落下', () => this.moveDown())
   }
 
+  private createTutorial(width: number, height: number) {
+    const shade = this.add.rectangle(width / 2, height / 2, width, height, 0xFAF7FF, 0.9)
+    const panel = this.add.rectangle(width / 2, height / 2, 560, 330, 0xFFFFFF, 0.98)
+      .setStrokeStyle(4, 0xB785E2, 0.9)
+    const title = this.add.text(width / 2, height / 2 - 118, '彩虹方块怎么玩？', {
+      fontSize: '34px', color: '#5A3C7D', fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif', fontStyle: 'bold',
+    }).setOrigin(0.5)
+    const instructions = this.add.text(width / 2, height / 2 - 30, '鼠标/触摸：点击下方「左、转一转、右、落下」按钮\n键盘：← → 移动，↑ / Enter / 空格旋转，↓ 加速落下\n手柄：摇杆或十字键移动，A / X 旋转', {
+      fontSize: '17px', color: '#775F92', fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif', align: 'center', lineSpacing: 11,
+    }).setOrigin(0.5)
+    const start = this.add.text(width / 2, height / 2 + 102, '开始拼一拼', {
+      fontSize: '22px', color: '#FFFFFF', fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif', fontStyle: 'bold', backgroundColor: '#9C71D0', padding: { x: 32, y: 12 },
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true })
+    start.on('pointerdown', () => this.dismissTutorial())
+    this.tutorialOverlay = this.add.container(0, 0, [shade, panel, title, instructions, start]).setDepth(30)
+  }
+
+  private dismissTutorial() {
+    this.tutorialOverlay?.destroy(true)
+    this.tutorialOverlay = undefined
+  }
+
   private handleInput(action: GameAction) {
+    if (this.tutorialOverlay) {
+      if (action === GameAction.CONFIRM || action === GameAction.OPTION_1) this.dismissTutorial()
+      return
+    }
     if (action === GameAction.BACK) {
       this.returnToHub()
       return
@@ -194,24 +229,24 @@ export class RainbowBlocksScene extends Phaser.Scene {
     }
     if (action === GameAction.LEFT) this.moveLeft()
     if (action === GameAction.RIGHT) this.moveRight()
-    if (action === GameAction.UP || action === GameAction.CONFIRM) this.rotate()
+    if (action === GameAction.UP || action === GameAction.CONFIRM || action === GameAction.OPTION_1) this.rotate()
     if (action === GameAction.DOWN) this.moveDown()
   }
 
   private moveLeft() {
-    if (!this.gameEnded) this.engine.moveLeft()
+    if (!this.gameEnded && !this.tutorialOverlay) this.engine.moveLeft()
   }
 
   private moveRight() {
-    if (!this.gameEnded) this.engine.moveRight()
+    if (!this.gameEnded && !this.tutorialOverlay) this.engine.moveRight()
   }
 
   private rotate() {
-    if (!this.gameEnded) this.engine.rotate()
+    if (!this.gameEnded && !this.tutorialOverlay) this.engine.rotate()
   }
 
   private moveDown() {
-    if (!this.gameEnded) this.engine.moveDown()
+    if (!this.gameEnded && !this.tutorialOverlay) this.engine.moveDown()
   }
 
   private renderBoard() {

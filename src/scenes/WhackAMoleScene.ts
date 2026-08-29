@@ -45,7 +45,6 @@ export class WhackAMoleScene extends Phaser.Scene {
   private score = 0
   private combo = 0
   private maxCombo = 0
-  private lives = 4
   private timeLeft = 45
   private roundDuration = 45
   private spawnTimer = 0.6
@@ -55,12 +54,32 @@ export class WhackAMoleScene extends Phaser.Scene {
   private gameStarted = false
   private paused = false
   private gameEnded = false
+  private readonly onPointerMove = (pointer: Phaser.Input.Pointer) => this.moveHammer(pointer)
 
   constructor() {
     super({ key: 'WhackAMoleScene' })
   }
 
   create() {
+    this.cleanupInput?.()
+    this.cleanupInput = null
+    this.slots = []
+    this.startOverlay = undefined
+    this.pauseOverlay = undefined
+    this.selectedIndex = 4
+    this.score = 0
+    this.combo = 0
+    this.maxCombo = 0
+    this.timeLeft = 45
+    this.roundDuration = 45
+    this.spawnTimer = 0.6
+    this.attempts = 0
+    this.hits = 0
+    this.difficulty = 'normal'
+    this.gameStarted = false
+    this.paused = false
+    this.gameEnded = false
+
     const { width, height } = this.scale
     this.cameras.main.setBackgroundColor('#DFF3B7')
     this.createGarden(width, height)
@@ -126,8 +145,17 @@ export class WhackAMoleScene extends Phaser.Scene {
     const area = this.add.zone(width / 2, height / 2 + 36, width - 36, height - 160)
       .setInteractive({ useHandCursor: true })
     area.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      if (this.isPointerOverSlot(pointer)) return
       this.moveHammer(pointer)
       this.missAttempt()
+    })
+  }
+
+  private isPointerOverSlot(pointer: Phaser.Input.Pointer) {
+    return this.slots.some((slot) => {
+      const horizontal = (pointer.x - slot.x) / 56
+      const vertical = (pointer.y - (slot.y - 12)) / 57
+      return horizontal * horizontal + vertical * vertical <= 1
     })
   }
 
@@ -312,8 +340,8 @@ export class WhackAMoleScene extends Phaser.Scene {
   }
 
   private createTouchHint(width: number, height: number) {
-    this.add.text(width / 2, height - 26, '点击或轻触地鼠 · 方向键/手柄选洞 · 敲金鼠得高分，炸弹别点', {
-      fontSize: '16px',
+    this.add.text(width / 2, height - 30, '鼠标/触摸：点击地鼠　·　键盘：方向键选洞，Enter/空格敲击　·　手柄：摇杆/十字键选洞，A/X 敲击', {
+      fontSize: '14px',
       color: '#4B6630',
       fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif',
     }).setOrigin(0.5)
@@ -326,7 +354,7 @@ export class WhackAMoleScene extends Phaser.Scene {
       .setStrokeStyle(3, 0xFFF0C7)
     const cap = this.add.rectangle(-39, -34, 20, 30, 0xF2B35A).setAngle(-28)
     this.hammer = this.add.container(-100, -100, [handle, head, cap]).setDepth(18).setVisible(false)
-    this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => this.moveHammer(pointer))
+    this.input.on('pointermove', this.onPointerMove)
   }
 
   private moveHammer(pointer: Phaser.Input.Pointer) {
@@ -412,12 +440,10 @@ export class WhackAMoleScene extends Phaser.Scene {
       return
     }
     if (slot.kind === 'bomb') {
-      this.lives -= 1
       this.combo = 0
       this.cameras.main.shake(180, 0.009)
-      this.showFeedback('小心炸弹，少一颗爱心。', '#C94C50')
+      this.showFeedback('小心炸弹，没关系，继续敲！', '#C94C50')
       this.hideSlot(slot, true)
-      if (this.lives <= 0) this.finishGame()
       return
     }
     slot.health -= 1
@@ -504,8 +530,8 @@ export class WhackAMoleScene extends Phaser.Scene {
     const subtitle = this.add.text(width / 2, 226, '看准时机，连击得分翻倍', {
       fontSize: '19px', color: '#E3F4BF', fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif',
     }).setOrigin(0.5)
-    const hint = this.add.text(width / 2, 566, '鼠标点击或轻触 · 方向键/手柄选择 · Enter/A 敲击', {
-      fontSize: '17px', color: '#F0FFE1', fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif',
+    const hint = this.add.text(width / 2, 566, '怎么玩\n鼠标/触摸：直接点击地鼠\n键盘：方向键选择，Enter/空格敲击　·　手柄：摇杆/十字键选择，A/X 敲击', {
+      fontSize: '14px', color: '#F0FFE1', fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif', align: 'center', lineSpacing: 5,
     }).setOrigin(0.5)
     this.startOverlay = this.add.container(0, 0, [shade, title, subtitle, hint]).setDepth(30)
     const choices: Array<{ difficulty: MoleDifficulty; label: string; detail: string; color: number }> = [
@@ -534,7 +560,6 @@ export class WhackAMoleScene extends Phaser.Scene {
     this.gameStarted = true
     this.roundDuration = difficulty === 'easy' ? 60 : difficulty === 'hard' ? 35 : 45
     this.timeLeft = this.roundDuration
-    this.lives = difficulty === 'easy' ? 5 : difficulty === 'hard' ? 3 : 4
     this.spawnTimer = 0.42
     this.startOverlay?.destroy(true)
     this.startOverlay = undefined
@@ -586,7 +611,7 @@ export class WhackAMoleScene extends Phaser.Scene {
   private refreshHud() {
     this.scoreText.setText(`得分 ${this.score}`)
     this.timerText.setText(`${Math.ceil(this.timeLeft)} 秒`)
-    this.livesText.setText(`爱心 ${'●'.repeat(this.lives)}${'○'.repeat(4 - this.lives)}`)
+    this.livesText.setText('爱心 ∞')
     this.timerFill.width = 190 * Phaser.Math.Clamp(this.timeLeft / this.roundDuration, 0, 1)
     this.comboText.setText(this.combo >= 3 ? `${this.combo} 连击` : '')
     const accuracy = this.attempts === 0 ? 100 : Math.round(this.hits / this.attempts * 100)
@@ -660,7 +685,10 @@ export class WhackAMoleScene extends Phaser.Scene {
   private cleanup() {
     this.cleanupInput?.()
     this.cleanupInput = null
+    this.input.off('pointermove', this.onPointerMove)
     this.startOverlay?.destroy(true)
     this.pauseOverlay?.destroy(true)
+    this.startOverlay = undefined
+    this.pauseOverlay = undefined
   }
 }

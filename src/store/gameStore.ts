@@ -88,8 +88,8 @@ export const useGameStore = create<GameState>()(
       companionFragments: { math: 0, comparison: 0, pinyin: 0 },
       progress: createInitialProgress(),
       lastReward: null,
-      isMuted: true,
-      volume: 0.8,
+      isMuted: false,
+      volume: 1,
 
       setScreen: (screen) => set({ currentScreen: screen }),
       setModule: (mod) => set({ currentModule: mod }),
@@ -219,9 +219,6 @@ export const useGameStore = create<GameState>()(
         isMuted: state.isMuted,
         volume: state.volume,
       }),
-      onRehydrateStorage: () => (state) => {
-        state?.setMuted(true)
-      },
     },
   ),
 )
