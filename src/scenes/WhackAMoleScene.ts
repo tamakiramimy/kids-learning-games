@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { audioManager } from '../audio/AudioManager'
 import { GameAction, inputManager } from '../input/InputManager'
+import { CONTROL_PROFILES } from '../input/controlProfiles'
 import { useGameStore } from '../store/gameStore'
 
 type MoleKind = 'normal' | 'gold' | 'helmet' | 'bomb' | 'clock'
@@ -88,12 +89,12 @@ export class WhackAMoleScene extends Phaser.Scene {
     this.createBackButton()
     this.createHud(width)
     this.createSlots(width, height)
-    this.createTouchHint(width, height)
     this.createHammer()
     this.cleanupInput = inputManager.onInput((action) => this.handleInput(action))
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.cleanup())
     this.updateSelection(this.selectedIndex)
     this.createStartScreen(width, height)
+    inputManager.setControlProfile(CONTROL_PROFILES.moleStart)
     this.refreshHud()
   }
 
@@ -340,14 +341,6 @@ export class WhackAMoleScene extends Phaser.Scene {
     return this.add.container(x, y, items)
   }
 
-  private createTouchHint(width: number, height: number) {
-    this.add.text(width / 2, height - 30, '鼠标/触摸：点击地鼠　·　键盘：方向键选洞，Enter/空格敲击　·　手柄：摇杆/十字键选洞，A/X 敲击', {
-      fontSize: '14px',
-      color: '#4B6630',
-      fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif',
-    }).setOrigin(0.5)
-  }
-
   private createHammer() {
     const handle = this.add.rectangle(14, 28, 15, 78, 0x9B6538).setAngle(-28)
       .setStrokeStyle(2, 0x5D391F)
@@ -451,10 +444,10 @@ export class WhackAMoleScene extends Phaser.Scene {
     }
     slot.health -= 1
     this.hits += 1
-    audioManager.playEffect('hit')
     slot.mole.setScale(1.16, 0.8)
     this.tweens.add({ targets: slot.mole, scaleX: 1, scaleY: 1, duration: 130, ease: 'Back.easeOut' })
     if (slot.health > 0) {
+      audioManager.playEffect('hit')
       this.showFeedback('头盔裂开啦，再敲一下！', '#526F80')
       return
     }
@@ -570,6 +563,7 @@ export class WhackAMoleScene extends Phaser.Scene {
     this.spawnTimer = 0.42
     this.startOverlay?.destroy(true)
     this.startOverlay = undefined
+    inputManager.setControlProfile(CONTROL_PROFILES.molePlay)
   }
 
   private togglePause() {
@@ -578,8 +572,10 @@ export class WhackAMoleScene extends Phaser.Scene {
     if (!this.paused) {
       this.pauseOverlay?.destroy(true)
       this.pauseOverlay = undefined
+      inputManager.setControlProfile(CONTROL_PROFILES.molePlay)
       return
     }
+    inputManager.setControlProfile(CONTROL_PROFILES.molePaused)
     const { width, height } = this.scale
     const shade = this.add.rectangle(width / 2, height / 2, width, height, 0x29451D, 0.8)
     const panel = this.add.rectangle(width / 2, height / 2, 430, 250, 0xF8FFE8, 0.98)
@@ -648,6 +644,7 @@ export class WhackAMoleScene extends Phaser.Scene {
   private finishGame() {
     if (this.gameEnded) return
     this.gameEnded = true
+    inputManager.setControlProfile(CONTROL_PROFILES.moleResult)
     audioManager.playEffect(this.score > 0 ? 'success' : 'fail')
     const starsEarned = Math.min(3, Math.floor(this.score / 8))
     if (starsEarned > 0) useGameStore.getState().addStars(starsEarned)
@@ -691,6 +688,7 @@ export class WhackAMoleScene extends Phaser.Scene {
   }
 
   private cleanup() {
+    inputManager.setControlProfile(null)
     this.cleanupInput?.()
     this.cleanupInput = null
     this.input.off('pointermove', this.onPointerMove)

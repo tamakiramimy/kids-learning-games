@@ -3,6 +3,7 @@ import { audioManager } from '../audio/AudioManager'
 import { getNode } from '../config/gameContent'
 import { mathGenerator, type MathActivity, type MathQuestion } from '../generators/MathGenerator'
 import { GameAction, inputManager } from '../input/InputManager'
+import { CONTROL_PROFILES } from '../input/controlProfiles'
 import { useGameStore } from '../store/gameStore'
 import { createGameHud, showQuestCheckpoint, syncAudioSettings } from './GameHud'
 
@@ -25,6 +26,7 @@ export class MathGardenScene extends Phaser.Scene {
   }
 
   create() {
+    inputManager.setControlProfile(CONTROL_PROFILES.question)
     const node = this.getActiveNode()
     if (!node) {
       this.scene.start('AdventureMapScene')
@@ -68,6 +70,7 @@ export class MathGardenScene extends Phaser.Scene {
 
     this.cleanupInput = inputManager.onInput((action) => this.handleInput(action))
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      inputManager.setControlProfile(null)
       this.cleanupInput?.()
       this.cleanupInput = null
       audioManager.stop()

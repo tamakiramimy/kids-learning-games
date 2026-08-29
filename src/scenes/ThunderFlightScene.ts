@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { audioManager } from '../audio/AudioManager'
 import { GameAction, inputManager } from '../input/InputManager'
+import { CONTROL_PROFILES } from '../input/controlProfiles'
 import { useGameStore } from '../store/gameStore'
 
 type FlightItemKind = 'power' | 'shield' | 'turbo' | 'magnet' | 'star'
@@ -96,10 +97,10 @@ export class ThunderFlightScene extends Phaser.Scene {
     this.createBackButton()
     this.createFlightZone(width, height)
     this.player = this.createPlayer(width / 2, height - 118)
-    this.createControls(width, height)
     this.cleanupInput = inputManager.onInput((action) => this.handleInput(action))
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.cleanup())
     this.createStartScreen(width, height)
+    inputManager.setControlProfile(CONTROL_PROFILES.flightStart)
     this.refreshHud()
   }
 
@@ -229,31 +230,6 @@ export class ThunderFlightScene extends Phaser.Scene {
     zone.on('pointermove', (pointer: Phaser.Input.Pointer) => {
       if (pointer.isDown) this.movePlayerTo(pointer.x, pointer.y)
     })
-  }
-
-  private createControls(width: number, height: number) {
-    const createButton = (x: number, label: string, color: string, callback: () => void) => {
-      const button = this.add.circle(x, height - 52, label === '雷暴' ? 42 : 34, Number(color.replace('#', '0x')))
-        .setStrokeStyle(3, 0xEAF4FF, 0.9)
-        .setInteractive({ useHandCursor: true })
-      const text = this.add.text(x, height - 52, label, {
-        fontSize: label === '雷暴' ? '18px' : '28px',
-        color: '#FFFFFF',
-        fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif',
-        fontStyle: 'bold',
-      }).setOrigin(0.5)
-      button.on('pointerdown', callback)
-      text.setDepth(button.depth + 1)
-    }
-    createButton(126, '<', '#456DB7', () => this.movePlayer(-1))
-    createButton(width - 126, '>', '#456DB7', () => this.movePlayer(1))
-    createButton(width / 2, '雷暴', '#D77B3A', () => this.useStorm())
-    this.add.text(26, 145, '鼠标/触摸：拖动飞船\n键盘：方向键移动，空格/J 雷暴\n手柄：摇杆/十字键移动，A/X 雷暴', {
-      fontSize: '14px',
-      color: '#C5D8FF',
-      fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif',
-      lineSpacing: 5,
-    }).setOrigin(0, 0)
   }
 
   private spawnEnemy(startY = -54, startX?: number) {
@@ -390,7 +366,7 @@ export class ThunderFlightScene extends Phaser.Scene {
     })
   }
 
-  private destroyEnemy(enemy: FlightEnemy) {
+  private destroyEnemy(enemy: FlightEnemy, playSound = true) {
     if (this.gameEnded) return
     const index = this.enemies.indexOf(enemy)
     if (index >= 0) this.enemies.splice(index, 1)
@@ -399,7 +375,7 @@ export class ThunderFlightScene extends Phaser.Scene {
     const multiplier = 1 + Math.floor(this.combo / 5) * 0.25
     this.score += Math.round(enemy.points * multiplier)
     this.defeatedInWave += 1
-    audioManager.playEffect('correct')
+    if (playSound) audioManager.playEffect('correct')
     this.showImpact(enemy.sprite.x, enemy.sprite.y, 0xFFE58A)
     enemy.sprite.destroy()
     if (Math.random() < 0.28) this.spawnItem()
@@ -437,15 +413,16 @@ export class ThunderFlightScene extends Phaser.Scene {
   }
 
   private useStorm() {
-    if (this.gameEnded || this.storms <= 0) return
+    if (!this.gameStarted || this.paused || this.gameEnded || this.storms <= 0) return
     this.storms -= 1
+    audioManager.playEffect('storm')
     const beam = this.add.rectangle(this.player.x, this.player.y - 260, 52, 500, 0xF7D857, 0.72)
     this.cameras.main.flash(140, 255, 236, 152)
     this.tweens.add({ targets: beam, alpha: 0, duration: 220, onComplete: () => beam.destroy() })
     const targets = [...this.enemies]
     for (const enemy of targets) {
       if (this.gameEnded) break
-      this.destroyEnemy(enemy)
+      this.destroyEnemy(enemy, false)
     }
     this.showFeedback('雷暴清空天空！', '#FFE58A')
   }
@@ -575,6 +552,7 @@ export class ThunderFlightScene extends Phaser.Scene {
     this.goalForWave = difficulty === 'hard' ? 8 : 6
     this.startOverlay?.destroy(true)
     this.startOverlay = undefined
+    inputManager.setControlProfile(CONTROL_PROFILES.flightPlay)
     const enemyDelay = difficulty === 'easy' ? 1020 : difficulty === 'hard' ? 620 : 820
     const itemDelay = difficulty === 'easy' ? 1900 : difficulty === 'hard' ? 2700 : 2300
     this.enemyEvent = this.time.addEvent({ delay: enemyDelay, loop: true, callback: () => this.spawnEnemy() })
@@ -594,8 +572,10 @@ export class ThunderFlightScene extends Phaser.Scene {
     if (!this.paused) {
       this.pauseOverlay?.destroy(true)
       this.pauseOverlay = undefined
+      inputManager.setControlProfile(CONTROL_PROFILES.flightPlay)
       return
     }
+    inputManager.setControlProfile(CONTROL_PROFILES.flightPaused)
     const { width, height } = this.scale
     const shade = this.add.rectangle(width / 2, height / 2, width, height, 0x07102D, 0.8)
     const panel = this.add.rectangle(width / 2, height / 2, 430, 250, 0x172553, 0.98)
@@ -676,6 +656,7 @@ export class ThunderFlightScene extends Phaser.Scene {
   private finishGame(success: boolean) {
     if (this.gameEnded) return
     this.gameEnded = true
+    inputManager.setControlProfile(CONTROL_PROFILES.flightResult)
     this.enemyEvent?.remove(false)
     this.itemEvent?.remove(false)
     this.fireEvent?.remove(false)
@@ -716,6 +697,7 @@ export class ThunderFlightScene extends Phaser.Scene {
   }
 
   private cleanup() {
+    inputManager.setControlProfile(null)
     this.cleanupInput?.()
     this.cleanupInput = null
     this.enemyEvent?.remove(false)

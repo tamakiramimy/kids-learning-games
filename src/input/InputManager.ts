@@ -14,7 +14,24 @@ export const GameAction = {
 
 export type GameAction = typeof GameAction[keyof typeof GameAction]
 
+export type DirectionControl = 'none' | 'dpad' | 'horizontal' | 'stick'
+
+export interface VirtualActionButton {
+  action: GameAction
+  label: string
+  description: string
+}
+
+export interface ControlProfile {
+  id: string
+  direction: DirectionControl
+  buttons: VirtualActionButton[]
+  keyboardHint: string
+  gamepadHint: string
+}
+
 type InputCallback = (action: GameAction) => void
+type ProfileCallback = (profile: ControlProfile | null) => void
 type DirectionState = Record<'up' | 'down' | 'left' | 'right', boolean>
 
 const AXIS_PRESS_THRESHOLD = 0.5
@@ -23,7 +40,12 @@ const DIRECTION_REPEAT_INTERVAL = 110
 
 export class InputManager {
   private callbacks: Set<InputCallback> = new Set()
+  private profileCallbacks: Set<ProfileCallback> = new Set()
   private keysDown = new Set<string>()
+  private virtualSources = new Map<GameAction, Set<number>>()
+  private virtualAxis = { x: 0, y: 0 }
+  private virtualDirectionRepeatAt: Partial<Record<keyof DirectionState, number>> = {}
+  private controlProfile: ControlProfile | null = null
   private gamepadConnected = false
   private gamepadIndex: number | null = null
   private pollInterval: number | null = null
@@ -69,7 +91,10 @@ export class InputManager {
     window.addEventListener('gamepaddisconnected', this.onGamepadDisconnected)
     window.addEventListener('touchstart', this.onTouchStart, { passive: false })
     this.selectActiveGamepad()
-    this.pollInterval = window.setInterval(() => this.pollGamepad(), 16)
+    this.pollInterval = window.setInterval(() => {
+      this.pollVirtualDirections()
+      this.pollGamepad()
+    }, 16)
   }
 
   stop() {
@@ -82,6 +107,8 @@ export class InputManager {
     if (this.pollInterval !== null) clearInterval(this.pollInterval)
     this.pollInterval = null
     this.keysDown.clear()
+    this.clearVirtualInput()
+    this.setControlProfile(null)
     this.gamepadConnected = false
     this.gamepadIndex = null
     this.resetGamepadEdges()
@@ -89,7 +116,58 @@ export class InputManager {
 
   onInput(cb: InputCallback) {
     this.callbacks.add(cb)
-    return () => this.callbacks.delete(cb)
+    return () => {
+      this.callbacks.delete(cb)
+    }
+  }
+
+  onControlProfile(cb: ProfileCallback) {
+    this.profileCallbacks.add(cb)
+    cb(this.controlProfile)
+    return () => {
+      this.profileCallbacks.delete(cb)
+    }
+  }
+
+  setControlProfile(profile: ControlProfile | null) {
+    if (this.controlProfile?.id === profile?.id) return
+    this.clearVirtualInput()
+    this.controlProfile = profile
+    for (const callback of this.profileCallbacks) callback(profile)
+  }
+
+  pressVirtual(action: GameAction, pointerId: number) {
+    const sources = this.virtualSources.get(action) ?? new Set<number>()
+    const wasReleased = sources.size === 0
+    sources.add(pointerId)
+    this.virtualSources.set(action, sources)
+    if (wasReleased) {
+      this.emit(action)
+      const direction = this.directionForAction(action)
+      if (direction) this.virtualDirectionRepeatAt[direction] = performance.now() + DIRECTION_REPEAT_DELAY
+    }
+  }
+
+  releaseVirtual(action: GameAction, pointerId: number) {
+    const sources = this.virtualSources.get(action)
+    if (!sources) return
+    sources.delete(pointerId)
+    if (sources.size === 0) {
+      this.virtualSources.delete(action)
+      const direction = this.directionForAction(action)
+      if (direction) delete this.virtualDirectionRepeatAt[direction]
+    }
+  }
+
+  setVirtualAxis(x: number, y: number) {
+    this.virtualAxis.x = Math.max(-1, Math.min(1, x))
+    this.virtualAxis.y = Math.max(-1, Math.min(1, y))
+  }
+
+  clearVirtualInput() {
+    this.virtualSources.clear()
+    this.virtualAxis = { x: 0, y: 0 }
+    this.virtualDirectionRepeatAt = {}
   }
 
   isGamepadConnected() {
@@ -106,9 +184,13 @@ export class InputManager {
       - Number(this.keysDown.has('ArrowLeft') || this.keysDown.has('KeyA'))
     const keyboardY = Number(this.keysDown.has('ArrowDown') || this.keysDown.has('KeyS'))
       - Number(this.keysDown.has('ArrowUp') || this.keysDown.has('KeyW'))
+    const virtualX = this.virtualAxis.x
+      || Number(this.virtualSources.has(GameAction.RIGHT)) - Number(this.virtualSources.has(GameAction.LEFT))
+    const virtualY = this.virtualAxis.y
+      || Number(this.virtualSources.has(GameAction.DOWN)) - Number(this.virtualSources.has(GameAction.UP))
     return {
-      x: keyboardX || dpadX || gamepadX,
-      y: keyboardY || dpadY || gamepadY,
+      x: virtualX || keyboardX || dpadX || gamepadX,
+      y: virtualY || keyboardY || dpadY || gamepadY,
     }
   }
 
@@ -132,6 +214,7 @@ export class InputManager {
 
   private clearHeldInput = () => {
     this.keysDown.clear()
+    this.clearVirtualInput()
     this.resetGamepadEdges()
   }
 
@@ -184,6 +267,32 @@ export class InputManager {
     for (let index = 0; index < gamepad.buttons.length; index += 1) {
       if (gamepad.buttons[index]?.pressed) this.prevButtons.add(index)
     }
+  }
+
+  private pollVirtualDirections() {
+    const now = performance.now()
+    const actions: Record<keyof DirectionState, GameAction> = {
+      up: GameAction.UP,
+      down: GameAction.DOWN,
+      left: GameAction.LEFT,
+      right: GameAction.RIGHT,
+    }
+    for (const direction of Object.keys(actions) as Array<keyof DirectionState>) {
+      const action = actions[direction]
+      if (!this.virtualSources.has(action)) continue
+      if (now >= (this.virtualDirectionRepeatAt[direction] ?? Infinity)) {
+        this.emit(action)
+        this.virtualDirectionRepeatAt[direction] = now + DIRECTION_REPEAT_INTERVAL
+      }
+    }
+  }
+
+  private directionForAction(action: GameAction): keyof DirectionState | null {
+    if (action === GameAction.UP) return 'up'
+    if (action === GameAction.DOWN) return 'down'
+    if (action === GameAction.LEFT) return 'left'
+    if (action === GameAction.RIGHT) return 'right'
+    return null
   }
 
   private emitDirections(dpad: DirectionState) {

@@ -56,3 +56,197 @@ canvas {
   display: block;
   touch-action: none;
 }
+
+.virtual-controls {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.control-guide {
+  position: absolute;
+  left: 50%;
+  bottom: max(10px, env(safe-area-inset-bottom));
+  display: flex;
+  gap: 18px;
+  transform: translateX(-50%);
+  padding: 7px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 6px;
+  background: rgba(14, 24, 35, 0.72);
+  color: #FFFFFF;
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+}
+
+.virtual-direction-zone,
+.virtual-action-zone {
+  position: absolute;
+  bottom: max(22px, env(safe-area-inset-bottom));
+  pointer-events: none;
+}
+
+.virtual-direction-zone {
+  left: max(22px, env(safe-area-inset-left));
+}
+
+.virtual-action-zone {
+  right: max(24px, env(safe-area-inset-right));
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+}
+
+.virtual-button {
+  width: clamp(52px, 7.2vw, 72px);
+  height: clamp(52px, 7.2vw, 72px);
+  border: 2px solid rgba(255, 255, 255, 0.72);
+  border-radius: 50%;
+  background: rgba(19, 34, 48, 0.58);
+  color: #FFFFFF;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.24), inset 0 1px 4px rgba(255, 255, 255, 0.2);
+  pointer-events: auto;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.virtual-button:active {
+  transform: scale(0.92);
+  background: rgba(77, 184, 174, 0.82);
+}
+
+.virtual-button-label,
+.virtual-button-description {
+  display: block;
+  letter-spacing: 0;
+}
+
+.virtual-button-label {
+  font-size: clamp(18px, 3vw, 28px);
+  font-weight: 800;
+}
+
+.virtual-button-description {
+  margin-top: 1px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.action-a {
+  background: rgba(31, 142, 112, 0.68);
+}
+
+.action-b {
+  width: clamp(48px, 6.4vw, 64px);
+  height: clamp(48px, 6.4vw, 64px);
+  margin-bottom: 54px;
+  background: rgba(194, 80, 70, 0.66);
+}
+
+.virtual-dpad {
+  position: relative;
+  width: clamp(150px, 21vw, 210px);
+  height: clamp(150px, 21vw, 210px);
+}
+
+.virtual-dpad .virtual-button {
+  position: absolute;
+}
+
+.virtual-dpad .up { top: 0; left: 50%; transform: translateX(-50%); }
+.virtual-dpad .down { bottom: 0; left: 50%; transform: translateX(-50%); }
+.virtual-dpad .left { left: 0; top: 50%; transform: translateY(-50%); }
+.virtual-dpad .right { right: 0; top: 50%; transform: translateY(-50%); }
+.virtual-dpad .up:active { transform: translateX(-50%) scale(0.92); }
+.virtual-dpad .down:active { transform: translateX(-50%) scale(0.92); }
+.virtual-dpad .left:active { transform: translateY(-50%) scale(0.92); }
+.virtual-dpad .right:active { transform: translateY(-50%) scale(0.92); }
+
+.virtual-dpad--horizontal {
+  width: clamp(160px, 23vw, 230px);
+  height: clamp(72px, 10vw, 98px);
+}
+
+.virtual-stick {
+  position: relative;
+  width: clamp(148px, 20vw, 196px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: rgba(17, 30, 44, 0.42);
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  box-shadow: inset 0 0 22px rgba(0, 0, 0, 0.2);
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.virtual-stick-ring,
+.virtual-stick-knob {
+  position: absolute;
+  inset: 25%;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.virtual-stick-knob {
+  background: rgba(74, 169, 181, 0.76);
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.28);
+}
+
+@media (pointer: coarse), (any-pointer: coarse) {
+  .control-guide {
+    top: max(96px, env(safe-area-inset-top));
+    bottom: auto;
+    max-width: 62%;
+    white-space: normal;
+    text-align: center;
+    opacity: 0.78;
+  }
+}
+
+@media (orientation: portrait) {
+  #game-container > canvas {
+    margin-top: max(16px, env(safe-area-inset-top)) !important;
+  }
+
+  .control-guide {
+    top: calc(50% + min(31vw, 180px));
+    bottom: auto;
+    width: min(92%, 520px);
+    max-width: none;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .virtual-direction-zone,
+  .virtual-action-zone {
+    bottom: max(34px, env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .control-guide {
+    top: max(8px, env(safe-area-inset-top));
+    bottom: auto;
+    font-size: 10px;
+  }
+
+  .virtual-button-description {
+    display: none;
+  }
+}
+
+.virtual-controls--none .control-guide {
+  top: auto;
+  bottom: max(8px, env(safe-area-inset-bottom));
+  max-width: 94%;
+  opacity: 0.82;
+}
+
+.virtual-controls--touch:not(.virtual-controls--none) .control-guide {
+  display: none;
+}

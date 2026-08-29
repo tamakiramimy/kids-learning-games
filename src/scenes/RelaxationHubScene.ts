@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import { GameAction, inputManager } from '../input/InputManager'
+import { CONTROL_PROFILES } from '../input/controlProfiles'
 
 type RelaxationGameKey = 'ThunderFlightScene' | 'WhackAMoleScene' | 'RainbowBlocksScene' | 'TinyRaceScene'
 
@@ -25,6 +26,7 @@ export class RelaxationHubScene extends Phaser.Scene {
   }
 
   create() {
+    inputManager.setControlProfile(CONTROL_PROFILES.navigation)
     const { width, height } = this.scale
     this.cards = []
     this.cameras.main.setBackgroundColor('#F4F7FF')
@@ -56,6 +58,7 @@ export class RelaxationHubScene extends Phaser.Scene {
 
     this.cleanupInput = inputManager.onInput((action) => this.handleInput(action))
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      inputManager.setControlProfile(null)
       this.cleanupInput?.()
       this.cleanupInput = null
     })

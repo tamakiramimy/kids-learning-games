@@ -11,11 +11,6 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         window?.rootViewController = GameBridgeViewController()
         window?.makeKeyAndVisible()
 
-        if #available(iOS 16.0, *) {
-            let preferences = UIWindowScene.GeometryPreferences.iOS(interfaceOrientations: .landscape)
-            windowScene.requestGeometryUpdate(preferences)
-        }
-
         SceneDelegateProxy.shared.scene(scene, willConnectTo: session, options: connectionOptions)
     }
 

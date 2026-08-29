@@ -34,7 +34,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
-        (window?.rootViewController as? CAPBridgeViewController)?.supportedInterfaceOrientations ?? .landscape
+        (window?.rootViewController as? CAPBridgeViewController)?.supportedInterfaceOrientations ?? .allButUpsideDown
     }
 
     func application(_ application: UIApplication,

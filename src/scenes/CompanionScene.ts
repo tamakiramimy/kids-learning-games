@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { getWorld, WORLD_ORDER, type GameModule } from '../config/gameContent'
 import { GameAction, inputManager } from '../input/InputManager'
+import { CONTROL_PROFILES } from '../input/controlProfiles'
 import { useGameStore } from '../store/gameStore'
 
 interface CompanionCard {
@@ -22,6 +23,7 @@ export class CompanionScene extends Phaser.Scene {
   }
 
   create() {
+    inputManager.setControlProfile(CONTROL_PROFILES.navigation)
     const { width, height } = this.scale
     this.cards = []
     this.selectedIndex = 0
@@ -56,6 +58,7 @@ export class CompanionScene extends Phaser.Scene {
     this.cleanupInput = inputManager.onInput((action) => this.handleInput(action))
     this.unsubscribeStore = useGameStore.subscribe(() => this.refreshState())
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      inputManager.setControlProfile(null)
       this.cleanupInput?.()
       this.cleanupInput = null
       this.unsubscribeStore?.()

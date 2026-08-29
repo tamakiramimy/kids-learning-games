@@ -20,7 +20,7 @@ def wait_for_scene(page, scene_key):
 def verify_desktop(page, console_errors):
     page.goto(BASE_URL, wait_until="networkidle")
     page.wait_for_selector("canvas")
-    assert page.evaluate("window.__xingyaStore.getState().isMuted") is True
+    assert page.evaluate("window.__xingyaStore.getState().isMuted") is False
     page.wait_for_timeout(TRANSITION_SETTLE_MS)
     assert page.locator("canvas").count() == 1
     canvas_box = page.locator("canvas").bounding_box()
@@ -126,7 +126,7 @@ def verify_learning_hub(browser):
     page.goto(BASE_URL, wait_until="networkidle")
     page.wait_for_selector("canvas")
     wait_for_scene(page, "AdventureMapScene")
-    assert page.evaluate("window.__xingyaStore.getState().isMuted") is True
+    assert page.evaluate("window.__xingyaStore.getState().isMuted") is False
     page.mouse.click(500, 51)
     wait_for_scene(page, "LearningHubScene")
 
@@ -155,11 +155,13 @@ def verify_learning_hub(browser):
         assert details["moduleId"] == module_id
         assert details["imageKey"].startswith("learning-")
         assert details["optionCount"] == 3
+        page.evaluate("window.__xingyaStore.getState().setMuted(true)")
         page.mouse.click(1170, 42)
         muted_feedback = page.evaluate(
             "window.__xingyaGame.scene.getScene('LearningQuestScene').feedbackText.text"
         )
         assert "声音已关闭" in muted_feedback
+        page.evaluate("window.__xingyaStore.getState().setMuted(false)")
         page.screenshot(path=str(OUTPUT_DIR / f"learning-{index}.png"))
         page.mouse.click(72, 42)
         wait_for_scene(page, "LearningHubScene")
@@ -199,7 +201,7 @@ def verify_relaxation_games(browser):
             before_x = page.evaluate(
                 "window.__xingyaGame.scene.getScene('ThunderFlightScene').player.x"
             )
-            page.mouse.click(130, 666)
+            page.keyboard.press("ArrowLeft")
             page.wait_for_function(
                 "beforeX => window.__xingyaGame.scene.getScene('ThunderFlightScene').player.x < beforeX",
                 arg=before_x,
@@ -251,7 +253,7 @@ def verify_relaxation_games(browser):
             assert block_state["gameStatus"] == 1
             assert block_state["activeCells"] > 0
             assert "Shape" not in block_state["nextLabel"]
-            page.mouse.click(575, 666)
+            page.keyboard.press("Enter")
         else:
             page.mouse.click(640, 462)
             page.wait_for_function(
@@ -270,7 +272,7 @@ def verify_relaxation_games(browser):
                 "beforeLane => window.__xingyaGame.scene.getScene('TinyRaceScene').laneIndex === beforeLane",
                 arg=before_lane,
             )
-            page.mouse.click(130, 666)
+            page.keyboard.press("a")
             page.wait_for_function(
                 "beforeLane => window.__xingyaGame.scene.getScene('TinyRaceScene').laneIndex < beforeLane",
                 arg=before_lane,
@@ -401,6 +403,87 @@ def verify_race_narrow_landscape(browser):
     context.close()
 
 
+def verify_virtual_controls(browser):
+    cases = (
+        ("ThunderFlightScene", "flight-start", "flight-play", "stick"),
+        ("WhackAMoleScene", "mole-start", "mole-play", "dpad"),
+        ("RainbowBlocksScene", "blocks-tutorial", "blocks-play", "dpad"),
+        ("TinyRaceScene", "race-tutorial", "race-play", "horizontal"),
+    )
+    for scene_key, initial_profile, play_profile, direction in cases:
+        context = browser.new_context(viewport={"width": 844, "height": 390}, has_touch=True)
+        page = context.new_page()
+        page.goto(BASE_URL, wait_until="networkidle")
+        page.wait_for_selector("canvas")
+        page.evaluate(
+            "sceneKey => { window.__xingyaGame.scene.stop('AdventureMapScene'); window.__xingyaGame.scene.start(sceneKey) }",
+            scene_key,
+        )
+        wait_for_scene(page, scene_key)
+        page.locator(f'[data-profile="{initial_profile}"]').wait_for()
+        page.get_by_role("button", name="开始").click()
+        page.locator(f'[data-profile="{play_profile}"]').wait_for()
+        assert page.locator(f".virtual-controls--{direction}").count() == 1
+        assert page.get_by_role("button", name="暂停" if scene_key != "RainbowBlocksScene" else "返回").count() == 1
+        page.screenshot(path=str(OUTPUT_DIR / f"controls-{scene_key}.png"))
+        context.close()
+
+
+def verify_portrait_controls(browser):
+    context = browser.new_context(viewport={"width": 390, "height": 844}, has_touch=True)
+    page = context.new_page()
+    page.goto(BASE_URL, wait_until="networkidle")
+    page.wait_for_selector("canvas")
+    page.evaluate("window.__xingyaGame.scene.stop('AdventureMapScene'); window.__xingyaGame.scene.start('RainbowBlocksScene')")
+    wait_for_scene(page, "RainbowBlocksScene")
+    page.get_by_role("button", name="开始").click()
+    page.locator('[data-profile="blocks-play"]').wait_for()
+    canvas_box = page.locator("#game-container > canvas").bounding_box()
+    dpad_box = page.locator(".virtual-dpad").bounding_box()
+    action_box = page.locator(".virtual-action-zone").bounding_box()
+    assert canvas_box is not None and dpad_box is not None and action_box is not None
+    assert dpad_box["y"] >= canvas_box["y"] + canvas_box["height"]
+    assert dpad_box["x"] >= 0 and dpad_box["x"] + dpad_box["width"] <= 390
+    assert action_box["x"] >= 0 and action_box["x"] + action_box["width"] <= 390
+    assert dpad_box["y"] + dpad_box["height"] <= 844
+    assert action_box["y"] + action_box["height"] <= 844
+    page.screenshot(path=str(OUTPUT_DIR / "controls-portrait-blocks.png"))
+    context.close()
+
+
+def verify_game_audio(browser):
+        context = browser.new_context(viewport={"width": 844, "height": 390}, has_touch=True)
+        page = context.new_page()
+        page.add_init_script(
+                """(() => {
+                    window.__toneCount = 0
+                    const AudioContextClass = window.AudioContext || window.webkitAudioContext
+                    const originalCreateOscillator = AudioContextClass.prototype.createOscillator
+                    AudioContextClass.prototype.createOscillator = function () {
+                        window.__toneCount += 1
+                        return originalCreateOscillator.call(this)
+                    }
+                })()"""
+        )
+        page.goto(BASE_URL, wait_until="networkidle")
+        page.wait_for_selector("canvas")
+        assert page.evaluate("window.__xingyaStore.getState().isMuted") is False
+        page.evaluate("window.__xingyaGame.scene.stop('AdventureMapScene'); window.__xingyaGame.scene.start('RainbowBlocksScene')")
+        wait_for_scene(page, "RainbowBlocksScene")
+        page.get_by_role("button", name="开始").click()
+        page.locator('[data-profile="blocks-play"]').wait_for()
+        before = page.evaluate("window.__toneCount")
+        for _ in range(4):
+            page.get_by_role("button", name="旋转").click()
+            page.wait_for_timeout(120)
+            if page.evaluate("window.__toneCount") > before:
+                break
+            page.get_by_role("button", name="下方向").click()
+        after = page.evaluate("window.__toneCount")
+        assert after > before, {"before": before, "after": after}
+        context.close()
+
+
 def main():
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     with sync_playwright() as playwright:
@@ -422,6 +505,9 @@ def main():
         verify_order_challenge(browser)
         verify_narrow_landscape(browser)
         verify_race_narrow_landscape(browser)
+        verify_virtual_controls(browser)
+        verify_portrait_controls(browser)
+        verify_game_audio(browser)
         context.close()
         browser.close()
     print(f"UI verification passed. Screenshots: {OUTPUT_DIR}")

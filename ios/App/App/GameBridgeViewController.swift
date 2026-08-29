@@ -3,7 +3,7 @@ import UIKit
 
 final class GameBridgeViewController: CAPBridgeViewController {
     override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
-        .landscape
+        UIDevice.current.userInterfaceIdiom == .pad ? .all : .allButUpsideDown
     }
 
     override var shouldAutorotate: Bool {
@@ -11,6 +11,6 @@ final class GameBridgeViewController: CAPBridgeViewController {
     }
 
     override var preferredInterfaceOrientationForPresentation: UIInterfaceOrientation {
-        .landscapeRight
+        .portrait
     }
 }

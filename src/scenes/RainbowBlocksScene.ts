@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 import { Engine, type TetrisGameState } from 'tetris-engine'
 import { audioManager } from '../audio/AudioManager'
 import { GameAction, inputManager } from '../input/InputManager'
+import { CONTROL_PROFILES } from '../input/controlProfiles'
 import { useGameStore } from '../store/gameStore'
 
 const BLOCK_COLORS: Record<string, number> = {
@@ -72,13 +73,12 @@ export class RainbowBlocksScene extends Phaser.Scene {
     this.boardTop = 118
     this.createBoard()
     this.createInfoPanel(width)
-    this.createControlButtons(width, height)
 
     this.engine = new Engine(this.columns, this.rows, (state) => {
       const previousLines = this.engineState?.statistic.countLinesReduced ?? 0
       const previousShapes = this.engineState?.statistic.countShapesFalled ?? 0
       this.engineState = state
-      if (state.statistic.countLinesReduced > previousLines) audioManager.playEffect('success')
+      if (state.statistic.countLinesReduced > previousLines) audioManager.playEffect('clear')
       else if (state.statistic.countShapesFalled > previousShapes) audioManager.playEffect('drop')
       this.renderBoard()
     })
@@ -97,6 +97,7 @@ export class RainbowBlocksScene extends Phaser.Scene {
     this.cleanupInput = inputManager.onInput((action) => this.handleInput(action))
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.cleanup())
     this.createTutorial(width, height)
+    inputManager.setControlProfile(CONTROL_PROFILES.blocksTutorial)
   }
 
   private createBackground(width: number, height: number) {
@@ -179,24 +180,6 @@ export class RainbowBlocksScene extends Phaser.Scene {
     }).setOrigin(0.5)
   }
 
-  private createControlButtons(width: number, height: number) {
-    const createButton = (x: number, label: string, callback: () => void) => {
-      const button = this.add.text(x, height - 54, label, {
-        fontSize: '21px',
-        color: '#FFFFFF',
-        fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif',
-        fontStyle: 'bold',
-        backgroundColor: '#9C71D0',
-        padding: { x: 22, y: 13 },
-      }).setOrigin(0.5).setInteractive({ useHandCursor: true })
-      button.on('pointerdown', callback)
-    }
-    createButton(width / 2 - 190, '左', () => this.moveLeft())
-    createButton(width / 2 - 65, '转一转', () => this.rotate())
-    createButton(width / 2 + 90, '右', () => this.moveRight())
-    createButton(width / 2 + 210, '落下', () => this.moveDown())
-  }
-
   private createTutorial(width: number, height: number) {
     const shade = this.add.rectangle(width / 2, height / 2, width, height, 0xFAF7FF, 0.9)
     const panel = this.add.rectangle(width / 2, height / 2, 560, 330, 0xFFFFFF, 0.98)
@@ -218,6 +201,7 @@ export class RainbowBlocksScene extends Phaser.Scene {
     this.tutorialOverlay?.destroy(true)
     this.tutorialOverlay = undefined
     audioManager.playEffect('tap')
+    inputManager.setControlProfile(CONTROL_PROFILES.blocksPlay)
   }
 
   private handleInput(action: GameAction) {
@@ -241,29 +225,33 @@ export class RainbowBlocksScene extends Phaser.Scene {
 
   private moveLeft() {
     if (!this.gameEnded && !this.tutorialOverlay) {
+      const previousState = this.engineState
       this.engine.moveLeft()
-      audioManager.playEffect('move')
+      if (this.engineState !== previousState) audioManager.playEffect('move')
     }
   }
 
   private moveRight() {
     if (!this.gameEnded && !this.tutorialOverlay) {
+      const previousState = this.engineState
       this.engine.moveRight()
-      audioManager.playEffect('move')
+      if (this.engineState !== previousState) audioManager.playEffect('move')
     }
   }
 
   private rotate() {
     if (!this.gameEnded && !this.tutorialOverlay) {
+      const previousState = this.engineState
       this.engine.rotate()
-      audioManager.playEffect('tap')
+      if (this.engineState !== previousState) audioManager.playEffect('rotate')
     }
   }
 
   private moveDown(manual = true) {
     if (!this.gameEnded && !this.tutorialOverlay) {
+      const previousState = this.engineState
       this.engine.moveDown()
-      if (manual) audioManager.playEffect('move')
+      if (manual && this.engineState !== previousState) audioManager.playEffect('move')
     }
   }
 
@@ -291,6 +279,7 @@ export class RainbowBlocksScene extends Phaser.Scene {
   private finishGame() {
     if (this.gameEnded) return
     this.gameEnded = true
+    inputManager.setControlProfile(CONTROL_PROFILES.blocksResult)
     this.dropEvent.remove(false)
     const lines = this.engineState.statistic.countLinesReduced
     audioManager.playEffect(lines > 0 ? 'success' : 'fail')
@@ -324,6 +313,7 @@ export class RainbowBlocksScene extends Phaser.Scene {
   }
 
   private cleanup() {
+    inputManager.setControlProfile(null)
     this.cleanupInput?.()
     this.cleanupInput = null
     this.dropEvent?.remove(false)

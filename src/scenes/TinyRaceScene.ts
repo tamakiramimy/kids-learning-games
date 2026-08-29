@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { audioManager } from '../audio/AudioManager'
 import { GameAction, inputManager } from '../input/InputManager'
+import { CONTROL_PROFILES } from '../input/controlProfiles'
 import { useGameStore } from '../store/gameStore'
 import { ThreeRaceRenderer } from './ThreeRaceRenderer'
 import type { RaceVisual, RaceVisualKind } from './ThreeRaceRenderer'
@@ -81,7 +82,6 @@ export class TinyRaceScene extends Phaser.Scene {
     this.createHud(width)
     this.createBackButton()
     this.createRoadInput(width, height)
-    this.createControls(width, height)
     this.obstacleEvent = this.time.addEvent({ delay: 1500, loop: true, callback: () => this.spawnBarrier() })
     this.coinEvent = this.time.addEvent({ delay: 740, loop: true, callback: () => this.spawnCoin() })
     this.itemEvent = this.time.addEvent({ delay: 5200, loop: true, callback: () => this.spawnItem() })
@@ -94,6 +94,7 @@ export class TinyRaceScene extends Phaser.Scene {
     this.cleanupInput = inputManager.onInput((action) => this.handleInput(action))
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.cleanup())
     this.createTutorial(width, height)
+    inputManager.setControlProfile(CONTROL_PROFILES.raceTutorial)
     this.refreshHud()
   }
 
@@ -178,25 +179,6 @@ export class TinyRaceScene extends Phaser.Scene {
     })
   }
 
-  private createControls(width: number, height: number) {
-    const createControl = (x: number, label: string, color: number, callback: () => void) => {
-      const button = this.add.circle(x, height - 54, 35, color, 0.92)
-        .setStrokeStyle(3, 0xEAF7F7, 0.84)
-        .setInteractive({ useHandCursor: true })
-      const text = this.add.text(x, height - 54, label, {
-        fontSize: label === '加速' ? '16px' : '31px',
-        color: '#FFFFFF',
-        fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif',
-        fontStyle: 'bold',
-      }).setOrigin(0.5)
-      button.on('pointerdown', callback)
-      text.setDepth(2)
-    }
-    createControl(126, '<', 0x2b718f, () => this.changeLane(-1))
-    createControl(width - 126, '>', 0x2b718f, () => this.changeLane(1))
-    createControl(width / 2, '加速', 0xdf7d35, () => this.useBoost())
-  }
-
   private createTutorial(width: number, height: number) {
     const shade = this.add.rectangle(width / 2, height / 2, width, height, 0x102228, 0.76)
     const panel = this.add.rectangle(width / 2, height / 2, 590, 330, 0xF3FFFF, 0.98)
@@ -217,6 +199,8 @@ export class TinyRaceScene extends Phaser.Scene {
   private dismissTutorial() {
     this.tutorialOverlay?.destroy(true)
     this.tutorialOverlay = undefined
+    audioManager.playEffect('tap')
+    inputManager.setControlProfile(CONTROL_PROFILES.racePlay)
   }
 
   private spawnBarrier(startZ = -176, laneOverride?: number) {
@@ -325,7 +309,7 @@ export class TinyRaceScene extends Phaser.Scene {
     if (this.tutorialOverlay || this.paused || this.gameEnded || this.boostCharges <= 0 || this.boostTime > 0) return
     this.boostCharges -= 1
     this.boostTime = 4
-    audioManager.playEffect('success')
+    audioManager.playEffect('boost')
     this.showFeedback('氮气加速！金币双倍', '#FFD39B')
   }
 
@@ -362,8 +346,10 @@ export class TinyRaceScene extends Phaser.Scene {
     if (!this.paused) {
       this.pauseOverlay?.destroy(true)
       this.pauseOverlay = undefined
+      inputManager.setControlProfile(CONTROL_PROFILES.racePlay)
       return
     }
+    inputManager.setControlProfile(CONTROL_PROFILES.racePaused)
     const { width, height } = this.scale
     const shade = this.add.rectangle(width / 2, height / 2, width, height, 0x081317, 0.78)
     const panel = this.add.rectangle(width / 2, height / 2, 420, 236, 0x102228, 0.98)
@@ -406,6 +392,7 @@ export class TinyRaceScene extends Phaser.Scene {
   private finishGame(success: boolean) {
     if (this.gameEnded) return
     this.gameEnded = true
+    inputManager.setControlProfile(CONTROL_PROFILES.raceResult)
     this.obstacleEvent.remove(false)
     this.coinEvent.remove(false)
     this.itemEvent.remove(false)
@@ -434,6 +421,7 @@ export class TinyRaceScene extends Phaser.Scene {
   }
 
   private cleanup() {
+    inputManager.setControlProfile(null)
     this.cleanupInput?.()
     this.cleanupInput = null
     this.obstacleEvent?.remove(false)

@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 import { audioManager } from '../audio/AudioManager'
 import { getNextPlayableNode, getWorld, WORLD_ORDER, type GameModule } from '../config/gameContent'
 import { GameAction, inputManager } from '../input/InputManager'
+import { CONTROL_PROFILES } from '../input/controlProfiles'
 import { useGameStore } from '../store/gameStore'
 
 interface WorldCard {
@@ -34,6 +35,7 @@ export class AdventureMapScene extends Phaser.Scene {
     const { width, height } = this.scale
     this.cards = []
     this.transitioning = false
+    inputManager.setControlProfile(CONTROL_PROFILES.map)
     useGameStore.getState().setScreen('map')
     this.syncAudio()
     this.cameras.main.setBackgroundColor('#EAF8FF')
@@ -325,6 +327,7 @@ export class AdventureMapScene extends Phaser.Scene {
   }
 
   private releaseBindings() {
+    inputManager.setControlProfile(null)
     this.cleanupInput?.()
     this.cleanupInput = null
     this.unsubscribeStore?.()

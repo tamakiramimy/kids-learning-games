@@ -88,7 +88,7 @@ export const useGameStore = create<GameState>()(
       companionFragments: { math: 0, comparison: 0, pinyin: 0 },
       progress: createInitialProgress(),
       lastReward: null,
-      isMuted: true,
+      isMuted: false,
       volume: 1,
 
       setScreen: (screen) => set({ currentScreen: screen }),
@@ -209,6 +209,11 @@ export const useGameStore = create<GameState>()(
     }),
     {
       name: 'xingya-quest-progress-v1',
+      version: 1,
+      migrate: (persistedState, version) => {
+        const state = persistedState as GameState
+        return version === 0 ? { ...state, isMuted: false } : state
+      },
       partialize: (state) => ({
         maxCombo: state.maxCombo,
         totalCorrect: state.totalCorrect,

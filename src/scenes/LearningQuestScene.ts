@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 import { audioManager } from '../audio/AudioManager'
 import { getLearningModule, type LearningModuleDefinition, type LearningModuleId, type LearningQuestion } from '../config/learningContent'
 import { GameAction, inputManager } from '../input/InputManager'
+import { CONTROL_PROFILES } from '../input/controlProfiles'
 import { useGameStore } from '../store/gameStore'
 import { syncAudioSettings } from './GameHud'
 
@@ -32,6 +33,7 @@ export class LearningQuestScene extends Phaser.Scene {
   }
 
   create() {
+    inputManager.setControlProfile(CONTROL_PROFILES.question)
     const { width, height } = this.scale
     this.definition = getLearningModule(this.moduleId)
     this.cameras.main.setBackgroundColor('#FFFFFF')
@@ -80,6 +82,7 @@ export class LearningQuestScene extends Phaser.Scene {
 
     this.cleanupInput = inputManager.onInput((action) => this.handleInput(action))
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      inputManager.setControlProfile(null)
       this.cleanupInput?.()
       this.cleanupInput = null
       audioManager.stop()

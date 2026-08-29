@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 import { audioManager } from '../audio/AudioManager'
 import { getNextNode, getWorld } from '../config/gameContent'
 import { GameAction, inputManager } from '../input/InputManager'
+import { CONTROL_PROFILES } from '../input/controlProfiles'
 import { useGameStore } from '../store/gameStore'
 import { syncAudioSettings } from './GameHud'
 
@@ -13,6 +14,7 @@ export class RewardScene extends Phaser.Scene {
   }
 
   create() {
+    inputManager.setControlProfile(CONTROL_PROFILES.reward)
     const { width, height } = this.scale
     const reward = useGameStore.getState().lastReward
     syncAudioSettings()
@@ -122,6 +124,7 @@ export class RewardScene extends Phaser.Scene {
       if (action === GameAction.BACK) this.returnToMap()
     })
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      inputManager.setControlProfile(null)
       this.cleanupInput?.()
       this.cleanupInput = null
     })

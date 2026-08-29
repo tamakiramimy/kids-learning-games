@@ -1,9 +1,11 @@
 import { useRef, useEffect } from 'react'
+import { App as CapacitorApp } from '@capacitor/app'
 import Phaser from 'phaser'
 import { audioManager } from '../audio/AudioManager'
 import { createPhaserConfig } from '../config/phaserConfig'
 import { inputManager } from '../input/InputManager'
 import { useGameStore } from '../store/gameStore'
+import { VirtualControls } from './VirtualControls'
 
 export function GameContainer() {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -13,6 +15,17 @@ export function GameContainer() {
     if (!containerRef.current || gameRef.current) return
 
     const container = containerRef.current
+    const syncAudioSettings = () => {
+      const { isMuted, volume } = useGameStore.getState()
+      audioManager.setMuted(isMuted)
+      audioManager.setVolume(volume)
+    }
+    syncAudioSettings()
+    const unsubscribeAudioSettings = useGameStore.subscribe((state, previousState) => {
+      if (state.isMuted !== previousState.isMuted || state.volume !== previousState.volume) {
+        syncAudioSettings()
+      }
+    })
     const game = new Phaser.Game(createPhaserConfig(container))
     gameRef.current = game
     game.canvas.style.position = 'absolute'
@@ -39,8 +52,12 @@ export function GameContainer() {
     const unlockAudio = () => { void audioManager.unlock() }
     const handleVisibilityChange = () => {
       if (document.hidden) audioManager.suspend()
-      else audioManager.resume()
+      else void audioManager.resume()
     }
+    const appStateListener = CapacitorApp.addListener('appStateChange', ({ isActive }) => {
+      if (isActive) void audioManager.resume()
+      else audioManager.suspend()
+    })
     resizeObserver.observe(container)
     window.addEventListener('resize', refreshScale)
     window.addEventListener('orientationchange', refreshScale)
@@ -62,6 +79,8 @@ export function GameContainer() {
       game.canvas.removeEventListener('pointerdown', unlockAudio, true)
       game.canvas.removeEventListener('touchstart', unlockAudio, true)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
+      void appStateListener.then((listener) => listener.remove())
+      unsubscribeAudioSettings()
       audioManager.suspend()
       inputManager.stop()
       game.destroy(true)
@@ -80,6 +99,8 @@ export function GameContainer() {
       id="game-container"
       ref={containerRef}
       style={{ width: '100%', height: '100%' }}
-    />
+    >
+      <VirtualControls />
+    </div>
   )
 }

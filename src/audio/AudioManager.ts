@@ -1,7 +1,7 @@
 import { Capacitor } from '@capacitor/core'
 import { QueueStrategy, TextToSpeech } from '@capacitor-community/text-to-speech'
 
-export type SoundEffect = 'tap' | 'collect' | 'hit' | 'correct' | 'wrong' | 'success' | 'fail' | 'move' | 'drop'
+export type SoundEffect = 'tap' | 'collect' | 'hit' | 'correct' | 'wrong' | 'success' | 'fail' | 'move' | 'drop' | 'rotate' | 'clear' | 'storm' | 'boost'
 
 interface ToneStep {
   frequency: number
@@ -37,6 +37,25 @@ const EFFECTS: Record<SoundEffect, ToneStep[]> = {
   ],
   move: [{ frequency: 330, duration: 0.035, type: 'square', gain: 0.05 }],
   drop: [{ frequency: 110, duration: 0.07, type: 'triangle', gain: 0.09 }],
+  rotate: [
+    { frequency: 440, duration: 0.055, type: 'triangle', gain: 0.09 },
+    { frequency: 660, duration: 0.07, delay: 0.045, type: 'sine', gain: 0.08 },
+  ],
+  clear: [
+    { frequency: 523, duration: 0.08, type: 'sine', gain: 0.16 },
+    { frequency: 659, duration: 0.08, delay: 0.06, type: 'sine', gain: 0.16 },
+    { frequency: 784, duration: 0.08, delay: 0.12, type: 'sine', gain: 0.16 },
+    { frequency: 1047, duration: 0.16, delay: 0.18, type: 'sine', gain: 0.18 },
+  ],
+  storm: [
+    { frequency: 130, duration: 0.16, type: 'sawtooth', gain: 0.1 },
+    { frequency: 260, duration: 0.16, delay: 0.08, type: 'square', gain: 0.1 },
+    { frequency: 520, duration: 0.2, delay: 0.16, type: 'sine', gain: 0.13 },
+  ],
+  boost: [
+    { frequency: 180, duration: 0.1, type: 'sawtooth', gain: 0.08 },
+    { frequency: 420, duration: 0.18, delay: 0.07, type: 'sawtooth', gain: 0.1 },
+  ],
 }
 
 export class AudioManager {
@@ -143,9 +162,16 @@ export class AudioManager {
     if (this.audioContext?.state === 'running') void this.audioContext.suspend()
   }
 
-  resume() {
+  async resume() {
     if (typeof window !== 'undefined') this.synth = window.speechSynthesis
     this.nativeSpeechSupported = undefined
+    if (this.audioContext?.state === 'suspended') {
+      try {
+        await this.audioContext.resume()
+      } catch (error) {
+        console.warn('Sound effect playback could not resume.', error)
+      }
+    }
   }
 
   private async speakAsync(request: number, text: string, rate: number, pitch: number, language: string) {

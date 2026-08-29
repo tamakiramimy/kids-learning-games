@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { getLearningModule, LEARNING_MODULE_ORDER, type LearningModuleId } from '../config/learningContent'
 import { GameAction, inputManager } from '../input/InputManager'
+import { CONTROL_PROFILES } from '../input/controlProfiles'
 
 interface LearningCard {
   panel: Phaser.GameObjects.Rectangle
@@ -17,6 +18,7 @@ export class LearningHubScene extends Phaser.Scene {
   }
 
   create() {
+    inputManager.setControlProfile(CONTROL_PROFILES.navigation)
     const { width, height } = this.scale
     this.cards = []
     this.cameras.main.setBackgroundColor('#FFF9EC')
@@ -49,6 +51,7 @@ export class LearningHubScene extends Phaser.Scene {
 
     this.cleanupInput = inputManager.onInput((action) => this.handleInput(action))
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      inputManager.setControlProfile(null)
       this.cleanupInput?.()
       this.cleanupInput = null
     })
