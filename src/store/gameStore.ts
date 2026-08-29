@@ -88,7 +88,7 @@ export const useGameStore = create<GameState>()(
       companionFragments: { math: 0, comparison: 0, pinyin: 0 },
       progress: createInitialProgress(),
       lastReward: null,
-      isMuted: false,
+      isMuted: true,
       volume: 1,
 
       setScreen: (screen) => set({ currentScreen: screen }),

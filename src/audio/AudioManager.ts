@@ -1,7 +1,7 @@
 export class AudioManager {
   private synth: SpeechSynthesis
   private speaking = false
-  private muted = false
+  private muted = true
   private volume = 1
 
   constructor() {

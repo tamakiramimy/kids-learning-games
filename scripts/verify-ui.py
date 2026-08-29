@@ -138,6 +138,7 @@ def verify_learning_hub(browser):
         (826, 510, "poetry"),
     ]
     for index, (x, y, module_id) in enumerate(modules, start=1):
+        page.wait_for_timeout(TRANSITION_SETTLE_MS)
         page.mouse.click(x, y)
         wait_for_scene(page, "LearningQuestScene")
         page.wait_for_timeout(TRANSITION_SETTLE_MS)
@@ -252,6 +253,10 @@ def verify_relaxation_games(browser):
             assert "Shape" not in block_state["nextLabel"]
             page.mouse.click(575, 666)
         else:
+            page.mouse.click(640, 462)
+            page.wait_for_function(
+                "!window.__xingyaGame.scene.getScene('TinyRaceScene').tutorialOverlay"
+            )
             before_lane = page.evaluate(
                 "window.__xingyaGame.scene.getScene('TinyRaceScene').laneIndex"
             )
@@ -290,7 +295,7 @@ def verify_relaxation_games(browser):
                 "window.__xingyaGame.scene.getScene('TinyRaceScene').laneIndex === 1"
             )
         page.screenshot(path=str(OUTPUT_DIR / f"relaxation-{index}.png"))
-        page.mouse.click(72, 42)
+        page.mouse.click(42 if scene_key == "TinyRaceScene" else 72, 42)
         wait_for_scene(page, "RelaxationHubScene")
         if scene_key == "TinyRaceScene":
             page.wait_for_function("document.querySelectorAll('canvas.race-three-canvas').length === 0")
