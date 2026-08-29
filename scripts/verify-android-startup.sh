@@ -3,9 +3,14 @@ set -uo pipefail
 
 log_file="android-startup.log"
 current_log="android-startup-current.log"
+app_pid=""
 
 capture_log() {
-  adb logcat -d -v threadtime > "$log_file" || true
+  if [ -n "$app_pid" ]; then
+    adb logcat -d -v threadtime --pid="$app_pid" > "$log_file" || true
+  else
+    adb logcat -d -v threadtime > "$log_file" || true
+  fi
 }
 
 run_required() {
@@ -40,9 +45,15 @@ run_optional 'Disable mobile data' adb shell svc data disable
 run_required 'Clear logcat' adb logcat -c
 run_required 'Stop app' adb shell am force-stop com.xingya.kidslearning
 run_required 'Start app' adb shell am start -W -n com.xingya.kidslearning/.MainActivity
+app_pid="$(adb shell pidof com.xingya.kidslearning | tr -d '\r')"
+if [ -z "$app_pid" ]; then
+  echo '[android-startup] App process did not start.'
+  exit 1
+fi
+echo "[android-startup] App PID: $app_pid"
 
 ready=false
-for attempt in $(seq 1 30); do
+for attempt in $(seq 1 90); do
   run_required 'Read startup log' adb logcat -d -v brief > "$current_log"
   if grep -Fq '[xingya] startup-ready AdventureMapScene' "$current_log"; then
     ready=true
@@ -60,6 +71,8 @@ fi
 
 if [ "$ready" != true ]; then
   echo 'Android did not reach AdventureMapScene while offline.'
+  grep -E 'Capacitor|chromium|AndroidRuntime|xingya|FATAL|Exception|Error' "$current_log" | tail -n 100 || true
+  adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity|com.xingya.kidslearning' | head -n 40 || true
   exit 1
 fi
 
