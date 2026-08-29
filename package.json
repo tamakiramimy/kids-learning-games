@@ -1,7 +1,7 @@
 {
   "name": "kids-learning-games",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Offline learning adventures and gentle games for children aged 3 to 6.",
   "author": "tamakiramimy",
   "type": "module",
@@ -22,6 +22,7 @@
     "lint": "oxlint",
     "test:generators": "node --experimental-strip-types --experimental-specifier-resolution=node scripts/verify-generators.ts",
     "test:learning": "node --experimental-strip-types --experimental-specifier-resolution=node scripts/verify-learning-content.ts",
+    "verify:release": "node scripts/verify-release-version.cjs",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -62,6 +63,7 @@
   "build": {
     "appId": "com.kids.learn-game",
     "productName": "星芽奇旅",
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "directories": {
       "output": "release"
     },

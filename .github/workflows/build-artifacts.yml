@@ -218,3 +218,68 @@ jobs:
           name: xingya-ios-ipados-signed-ipa
           path: ${{ runner.temp }}/xingya-ios-signed/*.ipa
           if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    needs:
+      - desktop
+      - android
+      - ios
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Verify release version
+        run: npm run verify:release -- --tag "$GITHUB_REF_NAME"
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: xingya-*
+          path: artifacts
+      - name: Prepare release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./package.json').version")"
+          mkdir -p release-assets
+
+          find artifacts/xingya-windows-x64 -maxdepth 1 -type f -name '*.exe' -exec cp {} "release-assets/xingya-${version}-windows-x64.exe" \;
+          find artifacts/xingya-windows-arm64 -maxdepth 1 -type f -name '*.exe' -exec cp {} "release-assets/xingya-${version}-windows-arm64.exe" \;
+          find artifacts/xingya-macos-x64 -maxdepth 1 -type f -name '*.dmg' -exec cp {} "release-assets/xingya-${version}-macos-x64.dmg" \;
+          find artifacts/xingya-macos-arm64 -maxdepth 1 -type f -name '*.dmg' -exec cp {} "release-assets/xingya-${version}-macos-arm64.dmg" \;
+          cp artifacts/xingya-android-universal-apk/*.apk "release-assets/xingya-${version}-android-universal-debug.apk"
+          cp artifacts/xingya-android-universal-aab/*.aab "release-assets/xingya-${version}-android-universal-unsigned.aab"
+          cp artifacts/xingya-ios-ipados-unsigned-ipa/*.ipa "release-assets/xingya-${version}-ios-ipados-unsigned.ipa"
+
+          asset_count="$(find release-assets -maxdepth 1 -type f | wc -l)"
+          test "$asset_count" -eq 7
+          (cd release-assets && sha256sum * > SHA256SUMS.txt)
+      - name: Create or update release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          notes="$(cat <<'EOF'
+          ## 安装包说明
+
+          - Android APK 同时适配手机和平板，使用测试签名，可直接用于安装测试。
+          - Android AAB 为未签名构建验证产物，不能直接上传 Google Play。
+          - iOS/iPadOS IPA 是 iPhone 与 iPad 通用的未签名验证产物，不能直接安装到普通设备。
+          - Windows 与 macOS 安装包尚未进行商业代码签名，系统可能显示安全提示。
+          EOF
+          )"
+
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" release-assets/* --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" release-assets/* \
+              --verify-tag \
+              --title "星芽奇旅 $GITHUB_REF_NAME" \
+              --notes "$notes" \
+              --generate-notes
+          fi

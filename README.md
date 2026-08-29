@@ -86,11 +86,13 @@ npm run lint
 npm run build
 npm run test:learning
 npm run test:generators
+npm run verify:release
 ```
 
 - `npm run build`：TypeScript 检查和 Vite 生产构建。
 - `npm run test:learning`：学习内容、答案选项和本地图片资源完整性检查。
 - `npm run test:generators`：随机题目边界检查。
+- `npm run verify:release`：检查 npm、Android 和 Apple 的版本号及构建号一致性。
 - `npm run dev:electron`：启动 Electron 桌面开发模式。
 - `npm run build:electron`：构建当前机器支持的 macOS 与 Windows 桌面包。
 
@@ -111,20 +113,35 @@ npm run mobile:sync
 # 本机原生构建，需要 Android Studio/Java 21 或 Xcode
 npm run mobile:android
 npm run mobile:ios
+
+# Windows 本机构建 Android 手机/平板通用包
+cd android
+./gradlew.bat assembleDebug bundleRelease
 ```
 
-Android 原生工程在 `android/`，iOS/iPadOS 工程在 `ios/App/`。第一次打开时可分别使用 Android Studio 和 Xcode 选择模拟器或真机；正式商店包必须由各自平台的签名证书生成。
+Android 原生工程在 `android/`，iOS/iPadOS 工程在 `ios/App/`。Android 构建需要 JDK 21、Android SDK Platform 36 和 Build Tools 36；第一次打开时可分别使用 Android Studio 和 Xcode 选择模拟器或真机。Android 手机和平板共用一个 APK/AAB，iPhone 和 iPad 共用一个 Universal IPA。正式商店包必须由各自平台的签名证书生成。
 
-## GitHub Actions 制品
+## GitHub Actions 发布
 
 `.github/workflows/verify.yml` 会在 `main` 推送和 Pull Request 上运行依赖审计、静态检查、构建、学习内容测试、题目生成测试、无声 UI 回归与 Capacitor 同步检查。
 
-`.github/workflows/build-artifacts.yml` 可在 Actions 页面手动触发，也会在推送 `v*` 标签时触发，分别上传以下构建制品：
+`.github/workflows/build-artifacts.yml` 可在 Actions 页面手动触发，也会在推送与项目版本一致的 `vX.Y.Z` 标签时触发。手动运行只保留 Actions Artifacts；标签运行会创建 GitHub Release，并发布以下文件：
 
-- macOS x64 与 arm64（DMG）
-- Windows x64 与 arm64（安装包）
-- Android 通用 Debug APK 与未签名 Release AAB
-- iOS/iPadOS 未签名 IPA，用于内部检查
+- macOS x64 与 arm64 DMG
+- Windows x64 与 arm64 NSIS 安装包
+- Android 手机/平板通用 Debug APK 与未签名 Release AAB
+- iPhone/iPad 通用未签名 IPA
+- 全部发布文件的 `SHA256SUMS.txt`
+
+创建版本并发布：
+
+```bash
+npm run verify:release -- --tag v1.0.0
+git tag -a v1.0.0 -m "Release v1.0.0"
+git push origin v1.0.0
+```
+
+当前常规 Release 是跨平台构建验证版本：Windows 与 macOS 包没有商业代码签名；Android Debug APK 使用测试签名，可直接侧载测试，AAB 未签名且不能上传 Google Play；iOS/iPadOS IPA 未签名，只用于检查构建结果，不能直接安装到普通设备。
 
 手动勾选 `sign_ios` 后，工作流会生成可安装的 iOS/iPadOS 签名 IPA。执行前需要在仓库 Secrets 中配置：
 
