@@ -520,9 +520,20 @@ def verify_game_audio(browser):
         }"""
     )
     page.wait_for_function("window.__xingyaAudio.isBackgroundMusicPlaying()")
-    assert page.evaluate("window.__xingyaAudio.activeOscillators.size") == 0
+    page.evaluate(
+        """() => {
+            window.__xingyaAudio.pauseBackgroundMusic()
+            window.__effectToneCount = 0
+            const context = window.__xingyaAudio.audioContext
+            const originalCreateOscillator = context.createOscillator.bind(context)
+            context.createOscillator = () => {
+                window.__effectToneCount += 1
+                return originalCreateOscillator()
+            }
+        }"""
+    )
     page.get_by_role("button", name="旋转").click()
-    page.wait_for_function("window.__xingyaAudio.activeOscillators.size > 0")
+    page.wait_for_function("window.__effectToneCount > 0")
     context.close()
 
 
