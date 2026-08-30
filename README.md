@@ -139,9 +139,9 @@ Android 原生工程在 `android/`，iOS/iPadOS 工程在 `ios/App/`。Android �
 创建版本并发布：
 
 ```bash
-npm run verify:release -- --tag v1.0.4
-git tag -a v1.0.4 -m "Release v1.0.4"
-git push origin v1.0.4
+npm run verify:release -- --tag v1.0.5
+git tag -a v1.0.5 -m "Release v1.0.5"
+git push origin v1.0.5
 ```
 
 当前常规 Release 是跨平台构建验证版本：Windows 与 macOS 包没有商业代码签名；Android Debug APK 使用测试签名，可直接侧载测试，AAB 未签名且不能上传 Google Play；iOS/iPadOS IPA 未签名，只用于检查构建结果，不能直接安装到普通设备。

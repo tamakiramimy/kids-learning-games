@@ -267,7 +267,7 @@ def verify_relaxation_games(browser):
                 "beforeLane => window.__xingyaGame.scene.getScene('TinyRaceScene').laneIndex < beforeLane",
                 arg=before_lane,
             )
-            page.keyboard.press("d")
+            page.keyboard.press("ArrowRight")
             page.wait_for_function(
                 "beforeLane => window.__xingyaGame.scene.getScene('TinyRaceScene').laneIndex === beforeLane",
                 arg=before_lane,
@@ -425,6 +425,33 @@ def verify_virtual_controls(browser):
         page.locator(f'[data-profile="{play_profile}"]').wait_for()
         assert page.locator(f".virtual-controls--{direction}").count() == 1
         assert page.get_by_role("button", name="暂停" if scene_key != "RainbowBlocksScene" else "返回").count() == 1
+        if scene_key == "TinyRaceScene":
+            page.evaluate(
+                """() => {
+                    const scene = window.__xingyaGame.scene.getScene('TinyRaceScene')
+                    scene.obstacleEvent.paused = true
+                    scene.coinEvent.paused = true
+                    scene.itemEvent.paused = true
+                    scene.entities.forEach(entity => scene.raceRenderer.removeVisual(entity.visual))
+                    scene.entities = []
+                }"""
+            )
+            assert page.evaluate("window.__xingyaGame.scene.getScene('TinyRaceScene').laneIndex") == 1
+            page.get_by_role("button", name="▶方向").click()
+            page.wait_for_function("window.__xingyaGame.scene.getScene('TinyRaceScene').laneIndex === 2")
+            page.get_by_role("button", name="▶方向").click()
+            page.wait_for_function("window.__xingyaGame.scene.getScene('TinyRaceScene').feedbackText.text === '已经在最右车道'")
+            page.evaluate("window.__xingyaGame.scene.getScene('TinyRaceScene').boostCharges = 1")
+            page.get_by_role("button", name="加速").click()
+            page.wait_for_function(
+                """() => {
+                    const scene = window.__xingyaGame.scene.getScene('TinyRaceScene')
+                    return scene.boostCharges === 0 && scene.boostTime > 0
+                }"""
+            )
+            page.evaluate("window.__xingyaGame.scene.getScene('TinyRaceScene').boostTime = 0")
+            page.get_by_role("button", name="加速").click()
+            page.wait_for_function("window.__xingyaGame.scene.getScene('TinyRaceScene').feedbackText.text === '先收集氮气道具'")
         page.screenshot(path=str(OUTPUT_DIR / f"controls-{scene_key}.png"))
         context.close()
 
@@ -452,36 +479,51 @@ def verify_portrait_controls(browser):
 
 
 def verify_game_audio(browser):
-        context = browser.new_context(viewport={"width": 844, "height": 390}, has_touch=True)
-        page = context.new_page()
-        page.add_init_script(
-                """(() => {
-                    window.__toneCount = 0
-                    const AudioContextClass = window.AudioContext || window.webkitAudioContext
-                    const originalCreateOscillator = AudioContextClass.prototype.createOscillator
-                    AudioContextClass.prototype.createOscillator = function () {
-                        window.__toneCount += 1
-                        return originalCreateOscillator.call(this)
-                    }
-                })()"""
-        )
-        page.goto(BASE_URL, wait_until="networkidle")
-        page.wait_for_selector("canvas")
-        assert page.evaluate("window.__xingyaStore.getState().isMuted") is False
-        page.evaluate("window.__xingyaGame.scene.stop('AdventureMapScene'); window.__xingyaGame.scene.start('RainbowBlocksScene')")
-        wait_for_scene(page, "RainbowBlocksScene")
-        page.get_by_role("button", name="开始").click()
-        page.locator('[data-profile="blocks-play"]').wait_for()
-        before = page.evaluate("window.__toneCount")
-        for _ in range(4):
-            page.get_by_role("button", name="旋转").click()
-            page.wait_for_timeout(120)
-            if page.evaluate("window.__toneCount") > before:
-                break
-            page.get_by_role("button", name="下方向").click()
-        after = page.evaluate("window.__toneCount")
-        assert after > before, {"before": before, "after": after}
-        context.close()
+    context = browser.new_context(viewport={"width": 844, "height": 390}, has_touch=True)
+    page = context.new_page()
+    page.goto(BASE_URL, wait_until="networkidle")
+    page.wait_for_selector("canvas")
+    assert page.evaluate("window.__xingyaStore.getState().isMuted") is False
+    page.evaluate("window.__xingyaGame.scene.stop('AdventureMapScene'); window.__xingyaGame.scene.start('RainbowBlocksScene')")
+    wait_for_scene(page, "RainbowBlocksScene")
+    page.get_by_role("button", name="开始").click()
+    page.locator('[data-profile="blocks-play"]').wait_for()
+    page.wait_for_function("window.__xingyaAudio.isBackgroundMusicPlaying()")
+    initial_timer = page.evaluate("window.__xingyaAudio.musicTimer")
+    page.evaluate("Promise.all([window.__xingyaAudio.startBackgroundMusic(), window.__xingyaAudio.startBackgroundMusic()])")
+    assert page.evaluate("window.__xingyaAudio.musicTimer") == initial_timer
+    page.evaluate("window.__xingyaStore.getState().setMuted(true)")
+    page.wait_for_function(
+        "!window.__xingyaAudio.isBackgroundMusicPlaying() && window.__xingyaAudio.activeMusicVoices.size === 0"
+    )
+    page.evaluate("window.__xingyaStore.getState().setMuted(false)")
+    page.wait_for_function("window.__xingyaAudio.isBackgroundMusicPlaying()")
+    page.evaluate("window.__xingyaStore.getState().setVolume(0)")
+    page.wait_for_function("!window.__xingyaAudio.isBackgroundMusicPlaying()")
+    page.evaluate("window.__xingyaStore.getState().setVolume(0.5)")
+    page.wait_for_function("window.__xingyaAudio.isBackgroundMusicPlaying()")
+    page.evaluate(
+        """async () => {
+            const suspending = window.__xingyaAudio.suspend()
+            const starting = window.__xingyaAudio.startBackgroundMusic()
+            await Promise.all([suspending, starting])
+        }"""
+    )
+    assert page.evaluate("window.__xingyaAudio.musicTimer") is None
+    page.evaluate("window.__xingyaAudio.resume()")
+    page.wait_for_function("window.__xingyaAudio.isBackgroundMusicPlaying()")
+    page.evaluate(
+        """async () => {
+            const suspending = window.__xingyaAudio.suspend()
+            const resuming = window.__xingyaAudio.resume()
+            await Promise.all([suspending, resuming])
+        }"""
+    )
+    page.wait_for_function("window.__xingyaAudio.isBackgroundMusicPlaying()")
+    assert page.evaluate("window.__xingyaAudio.activeOscillators.size") == 0
+    page.get_by_role("button", name="旋转").click()
+    page.wait_for_function("window.__xingyaAudio.activeOscillators.size > 0")
+    context.close()
 
 
 def main():

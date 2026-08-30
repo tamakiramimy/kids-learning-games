@@ -17,10 +17,11 @@ export function GameContainer() {
     const container = containerRef.current
     const syncAudioSettings = () => {
       const { isMuted, volume } = useGameStore.getState()
-      audioManager.setMuted(isMuted)
       audioManager.setVolume(volume)
+      audioManager.setMuted(isMuted)
     }
     syncAudioSettings()
+    void audioManager.resume().then(() => audioManager.startBackgroundMusic())
     const unsubscribeAudioSettings = useGameStore.subscribe((state, previousState) => {
       if (state.isMuted !== previousState.isMuted || state.volume !== previousState.volume) {
         syncAudioSettings()
@@ -35,9 +36,11 @@ export function GameContainer() {
       const debugWindow = window as Window & {
         __xingyaGame?: Phaser.Game
         __xingyaStore?: typeof useGameStore
+        __xingyaAudio?: typeof audioManager
       }
       debugWindow.__xingyaGame = game
       debugWindow.__xingyaStore = useGameStore
+      debugWindow.__xingyaAudio = audioManager
     }
     inputManager.start()
 
@@ -49,7 +52,7 @@ export function GameContainer() {
     }
     const animationFrame = window.requestAnimationFrame(refreshInputBounds)
     const resizeObserver = new ResizeObserver(refreshScale)
-    const unlockAudio = () => { void audioManager.unlock() }
+    const unlockAudio = () => { void audioManager.startBackgroundMusic() }
     const handleVisibilityChange = () => {
       if (document.hidden) audioManager.suspend()
       else void audioManager.resume()
@@ -64,8 +67,8 @@ export function GameContainer() {
     window.visualViewport?.addEventListener('resize', refreshScale)
     game.canvas.addEventListener('pointerdown', refreshInputBounds, true)
     game.canvas.addEventListener('touchstart', refreshInputBounds, true)
-    game.canvas.addEventListener('pointerdown', unlockAudio, true)
-    game.canvas.addEventListener('touchstart', unlockAudio, true)
+    container.addEventListener('pointerdown', unlockAudio, true)
+    window.addEventListener('keydown', unlockAudio, true)
     document.addEventListener('visibilitychange', handleVisibilityChange)
 
     return () => {
@@ -76,20 +79,23 @@ export function GameContainer() {
       window.visualViewport?.removeEventListener('resize', refreshScale)
       game.canvas.removeEventListener('pointerdown', refreshInputBounds, true)
       game.canvas.removeEventListener('touchstart', refreshInputBounds, true)
-      game.canvas.removeEventListener('pointerdown', unlockAudio, true)
-      game.canvas.removeEventListener('touchstart', unlockAudio, true)
+      container.removeEventListener('pointerdown', unlockAudio, true)
+      window.removeEventListener('keydown', unlockAudio, true)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       void appStateListener.then((listener) => listener.remove())
       unsubscribeAudioSettings()
+      audioManager.stopBackgroundMusic()
       audioManager.suspend()
       inputManager.stop()
       game.destroy(true)
       const debugWindow = window as Window & {
         __xingyaGame?: Phaser.Game
         __xingyaStore?: typeof useGameStore
+        __xingyaAudio?: typeof audioManager
       }
       delete debugWindow.__xingyaGame
       delete debugWindow.__xingyaStore
+      delete debugWindow.__xingyaAudio
       gameRef.current = null
     }
   }, [])

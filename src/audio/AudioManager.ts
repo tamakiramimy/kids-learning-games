@@ -11,6 +11,13 @@ interface ToneStep {
   gain?: number
 }
 
+const MUSIC_STEP_SECONDS = 0.36
+const MUSIC_LOOKAHEAD_SECONDS = 0.72
+const MUSIC_SCHEDULER_INTERVAL = 160
+const MUSIC_MASTER_GAIN = 0.2
+const MUSIC_MELODY = [523.25, 659.25, 783.99, 659.25, 587.33, 698.46, 880, null, 783.99, 698.46, 659.25, 523.25, 587.33, 659.25, 523.25, null] as const
+const MUSIC_BASS = [130.81, 110, 174.61, 98] as const
+
 const EFFECTS: Record<SoundEffect, ToneStep[]> = {
   tap: [{ frequency: 520, duration: 0.045, type: 'sine', gain: 0.12 }],
   collect: [
@@ -62,6 +69,15 @@ export class AudioManager {
   private synth: SpeechSynthesis | undefined
   private audioContext: AudioContext | undefined
   private activeOscillators = new Set<OscillatorNode>()
+  private activeMusicVoices = new Map<OscillatorNode, GainNode>()
+  private musicGain: GainNode | undefined
+  private musicTimer: number | undefined
+  private musicDesired = false
+  private musicStep = 0
+  private nextMusicStepAt = 0
+  private audioTransition = Promise.resolve()
+  private audioLifecycleRevision = 0
+  private audioSuspended = false
   private speaking = false
   private muted = true
   private volume = 1
@@ -74,11 +90,19 @@ export class AudioManager {
 
   setMuted(muted: boolean) {
     this.muted = muted
-    if (muted) this.stop()
+    if (muted) {
+      this.stop()
+      this.pauseBackgroundMusic()
+    } else if (this.musicDesired) {
+      void this.startBackgroundMusic()
+    }
   }
 
   setVolume(volume: number) {
     this.volume = Math.min(1, Math.max(0, volume))
+    this.updateMusicGain()
+    if (this.volume <= 0) this.pauseBackgroundMusic()
+    else if (this.musicDesired && !this.muted && this.musicTimer === undefined) void this.startBackgroundMusic()
   }
 
   async unlock() {
@@ -106,6 +130,60 @@ export class AudioManager {
     }
 
     return Boolean(this.synth && typeof SpeechSynthesisUtterance !== 'undefined')
+  }
+
+  async startBackgroundMusic() {
+    this.musicDesired = true
+    if (this.muted || this.volume <= 0 || this.audioSuspended || this.musicTimer !== undefined) return false
+
+    try {
+      await this.audioTransition
+      if (this.muted || this.volume <= 0 || this.audioSuspended || !this.musicDesired || this.musicTimer !== undefined) {
+        return this.musicTimer !== undefined
+      }
+      const lifecycleRevision = this.audioLifecycleRevision
+      const unlocked = await this.unlock()
+      if (lifecycleRevision !== this.audioLifecycleRevision || this.audioSuspended) {
+        if (this.audioSuspended && this.audioContext?.state === 'running') await this.audioContext.suspend()
+        return false
+      }
+      if (!unlocked || this.muted || !this.musicDesired || !this.audioContext) return false
+      if (this.musicTimer !== undefined) return true
+
+      this.ensureMusicGain()
+      this.musicStep = 0
+      this.nextMusicStepAt = this.audioContext.currentTime + 0.05
+      this.scheduleBackgroundMusic()
+      this.musicTimer = window.setInterval(() => this.scheduleBackgroundMusic(), MUSIC_SCHEDULER_INTERVAL)
+      return true
+    } catch (error) {
+      console.warn('Background music is waiting for user activation.', error)
+      return false
+    }
+  }
+
+  pauseBackgroundMusic() {
+    if (this.musicTimer !== undefined) window.clearInterval(this.musicTimer)
+    this.musicTimer = undefined
+    this.activeMusicVoices.forEach((gain, oscillator) => {
+      try {
+        oscillator.stop()
+      } catch {
+        // The oscillator may already have ended.
+      }
+      oscillator.disconnect()
+      gain.disconnect()
+    })
+    this.activeMusicVoices.clear()
+  }
+
+  stopBackgroundMusic() {
+    this.musicDesired = false
+    this.pauseBackgroundMusic()
+  }
+
+  isBackgroundMusicPlaying() {
+    return this.musicTimer !== undefined && this.audioContext?.state === 'running' && !this.muted
   }
 
   speak(text: string, rate = 0.8, pitch = 1.1, language = 'zh-CN') {
@@ -158,19 +236,33 @@ export class AudioManager {
   }
 
   suspend() {
+    this.audioLifecycleRevision += 1
+    this.audioSuspended = true
     this.stop()
-    if (this.audioContext?.state === 'running') void this.audioContext.suspend()
+    this.pauseBackgroundMusic()
+    this.audioTransition = this.audioTransition.then(async () => {
+      if (this.audioContext?.state === 'running') await this.audioContext.suspend()
+    }).catch((error) => {
+      console.warn('Audio playback could not suspend.', error)
+    })
+    return this.audioTransition
   }
 
   async resume() {
+    const revision = ++this.audioLifecycleRevision
+    this.audioSuspended = false
     if (typeof window !== 'undefined') this.synth = window.speechSynthesis
     this.nativeSpeechSupported = undefined
-    if (this.audioContext?.state === 'suspended') {
-      try {
+    this.audioTransition = this.audioTransition.then(async () => {
+      if (this.audioContext?.state === 'suspended') {
         await this.audioContext.resume()
-      } catch (error) {
-        console.warn('Sound effect playback could not resume.', error)
       }
+    }).catch((error) => {
+      console.warn('Audio playback could not resume.', error)
+    })
+    await this.audioTransition
+    if (revision === this.audioLifecycleRevision && this.musicDesired && !this.muted) {
+      await this.startBackgroundMusic()
     }
   }
 
@@ -232,6 +324,56 @@ export class AudioManager {
     } catch (error) {
       console.warn('Sound effect playback is unavailable.', error)
     }
+  }
+
+  private ensureMusicGain() {
+    if (!this.audioContext || this.musicGain) return
+    this.musicGain = this.audioContext.createGain()
+    this.musicGain.connect(this.audioContext.destination)
+    this.updateMusicGain()
+  }
+
+  private updateMusicGain() {
+    if (!this.audioContext || !this.musicGain) return
+    const gain = this.muted ? 0 : MUSIC_MASTER_GAIN * this.volume
+    this.musicGain.gain.setTargetAtTime(gain, this.audioContext.currentTime, 0.04)
+  }
+
+  private scheduleBackgroundMusic() {
+    if (!this.audioContext || this.audioContext.state !== 'running' || this.muted || !this.musicDesired) return
+    const scheduleUntil = this.audioContext.currentTime + MUSIC_LOOKAHEAD_SECONDS
+    while (this.nextMusicStepAt < scheduleUntil) {
+      const melody = MUSIC_MELODY[this.musicStep % MUSIC_MELODY.length]
+      if (melody) this.playMusicTone(melody, this.nextMusicStepAt, MUSIC_STEP_SECONDS * 0.82, 'triangle', 0.13)
+      if (this.musicStep % 4 === 0) {
+        const bass = MUSIC_BASS[Math.floor(this.musicStep / 4) % MUSIC_BASS.length]
+        this.playMusicTone(bass, this.nextMusicStepAt, MUSIC_STEP_SECONDS * 3.7, 'sine', 0.1)
+      }
+      this.musicStep = (this.musicStep + 1) % MUSIC_MELODY.length
+      this.nextMusicStepAt += MUSIC_STEP_SECONDS
+    }
+  }
+
+  private playMusicTone(frequency: number, startsAt: number, duration: number, type: OscillatorType, level: number) {
+    if (!this.audioContext || !this.musicGain) return
+    const endsAt = startsAt + duration
+    const oscillator = this.audioContext.createOscillator()
+    const gain = this.audioContext.createGain()
+    oscillator.type = type
+    oscillator.frequency.setValueAtTime(frequency, startsAt)
+    gain.gain.setValueAtTime(0.0001, startsAt)
+    gain.gain.exponentialRampToValueAtTime(level, startsAt + 0.025)
+    gain.gain.exponentialRampToValueAtTime(0.0001, endsAt)
+    oscillator.connect(gain)
+    gain.connect(this.musicGain)
+    oscillator.start(startsAt)
+    oscillator.stop(endsAt + 0.01)
+    this.activeMusicVoices.set(oscillator, gain)
+    oscillator.addEventListener('ended', () => {
+      this.activeMusicVoices.delete(oscillator)
+      oscillator.disconnect()
+      gain.disconnect()
+    }, { once: true })
   }
 
   private playTone(step: ToneStep, startTime: number) {

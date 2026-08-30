@@ -301,12 +301,25 @@ export class TinyRaceScene extends Phaser.Scene {
   private changeLane(direction: number) {
     if (this.tutorialOverlay || this.paused || this.gameEnded) return
     const nextLane = Phaser.Math.Clamp(this.laneIndex + direction, 0, 2)
-    if (nextLane !== this.laneIndex) audioManager.playEffect('move')
+    if (nextLane === this.laneIndex) {
+      this.showFeedback(direction < 0 ? '已经在最左车道' : '已经在最右车道', '#BDEEF0')
+      return
+    }
+    audioManager.playEffect('move')
     this.laneIndex = nextLane
   }
 
   private useBoost() {
-    if (this.tutorialOverlay || this.paused || this.gameEnded || this.boostCharges <= 0 || this.boostTime > 0) return
+    if (this.tutorialOverlay || this.paused || this.gameEnded) return
+    if (this.boostTime > 0) {
+      this.showFeedback('正在氮气冲刺', '#FFD39B')
+      return
+    }
+    if (this.boostCharges <= 0) {
+      audioManager.playEffect('tap')
+      this.showFeedback('先收集氮气道具', '#FFF0A5')
+      return
+    }
     this.boostCharges -= 1
     this.boostTime = 4
     audioManager.playEffect('boost')
